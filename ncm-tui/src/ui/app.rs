@@ -26,7 +26,7 @@ pub struct App<'a> {
     // app 状态
     current_screen: ScreenEnum,
     current_mode: AppMode,
-    need_redraw: bool,
+    need_reupdate_view: bool,
 
     //
     terminal: Terminal<CrosstermBackend<Stdout>>,
@@ -50,7 +50,7 @@ impl<'a> App<'a> {
             command_line: CommandLine::new(&normal_style),
             current_screen: ScreenEnum::Main,
             current_mode: AppMode::Normal,
-            need_redraw: true,
+            need_reupdate_view: true,
             terminal,
             command_queue: VecDeque::new(),
             normal_style,
@@ -87,13 +87,6 @@ impl<'a> App<'a> {
                 Command::Quit => {
                     return Ok(false);
                 },
-                Command::Down | Command::Up => {
-                    match self.current_screen {
-                        ScreenEnum::Main => self.main_screen.handle_event(cmd).await?,
-                        ScreenEnum::Login => self.login_screen.handle_event(cmd).await?,
-                        ScreenEnum::Help => self.help_screen.handle_event(cmd).await?,
-                    }
-                },
                 Command::GotoScreen(to_screen) => {
                     self.switch_screen(to_screen).await;
                 },
@@ -108,6 +101,16 @@ impl<'a> App<'a> {
                     NCM_API.lock().await
                         .logout().await;
                 },
+                // 需要向下传递的事件
+                Command::Down | Command::Up | Command::Esc => {
+                    // 先 update_model(), 再 handle_event()
+                    // 取或值
+                    self.need_reupdate_view = match self.current_screen {
+                        ScreenEnum::Main => self.main_screen.handle_event(cmd).await?,
+                        ScreenEnum::Login => self.login_screen.handle_event(cmd).await?,
+                        ScreenEnum::Help => self.help_screen.handle_event(cmd).await?,
+                    } || self.need_reupdate_view;
+                },
                 _ => {},
             }
         }
@@ -116,7 +119,7 @@ impl<'a> App<'a> {
     }
 
     pub async fn update_model(&mut self) -> Result<()> {
-        self.need_redraw = match self.current_screen {
+        self.need_reupdate_view = match self.current_screen {
             ScreenEnum::Help => false,
             ScreenEnum::Login => self.update_login_model().await?,
             ScreenEnum::Main => self.main_screen.update_model().await?,
@@ -135,7 +138,7 @@ impl<'a> App<'a> {
 
     pub fn draw(&mut self) -> Result<()> {
         //
-        if self.need_redraw {
+        if self.need_reupdate_view {
             self.update_view();
         }
 
@@ -195,6 +198,7 @@ impl<'a> App<'a> {
             KeyCode::Char(',') => Command::PrevTrack,
             KeyCode::Char('.') => Command::NextTrack,
             KeyCode::Enter => Command::QueueAndPlay,
+            KeyCode::Esc => Command::Esc,
             KeyCode::Char('r') => Command::ToggleRepeat,
             KeyCode::Char('s') => Command::ToggleShuffle,
             KeyCode::Char('g') => Command::GotoTop,
@@ -270,6 +274,7 @@ impl<'a> App<'a> {
         self.main_screen = MainScreen::new(&self.normal_style); // &normal_style
         self.main_screen.update_playlist_model(playlist_name, play_name_list);
         // self.playlist_screen = PlaylistScreen::new(&normal_style);
+
         self.switch_screen(ScreenEnum::Main).await;
 
         Ok(())
@@ -281,7 +286,7 @@ impl<'a> App<'a> {
             return;
         }
 
-        self.need_redraw = true;
+        self.need_reupdate_view = true;
         self.current_screen = to_screen;
     }
 }

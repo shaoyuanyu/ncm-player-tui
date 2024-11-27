@@ -6,6 +6,7 @@ pub enum Command {
     Quit,
     Down,
     Up,
+    Esc,
     NextPanel,
     PrevPanel,
     Play,

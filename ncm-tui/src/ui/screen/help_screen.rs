@@ -43,11 +43,11 @@ impl<'a> HelpScreen<'a> {
 }
 
 impl<'a> Controller for HelpScreen<'a> {
-    async fn handle_event(&mut self, _cmd: Command) -> Result<()> {
-        Ok(())
+    async fn update_model(&mut self) -> Result<bool> {
+        Ok(false)
     }
 
-    async fn update_model(&mut self) -> Result<bool> {
+    async fn handle_event(&mut self, _cmd: Command) -> Result<bool> {
         Ok(false)
     }
 

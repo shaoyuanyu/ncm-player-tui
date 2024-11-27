@@ -12,6 +12,13 @@ use crate::ui::widget::UIList;
 
 const SELECTED_STYLE: Style = Style::new().bg(SLATE.c800).add_modifier(Modifier::BOLD);
 
+pub enum FocusPanel {
+    PlaylistOutside,
+    PlaylistInside,
+    LyricOutside,
+    LyricInside,
+}
+
 pub struct MainScreen<'a> {
     // model
     user_name: String,
@@ -19,6 +26,7 @@ pub struct MainScreen<'a> {
     playlist: Vec<String>, // TODO: Playlist
     playlist_items: Vec<ListItem<'a>>,
     current_song: String, // TODO: Song
+    current_focus_panel: FocusPanel,
 
     // view
     playlist_ui: UIList<'a>,
@@ -33,6 +41,7 @@ impl<'a> MainScreen<'a> {
             playlist: Vec::new(),
             playlist_items: Vec::new(),
             current_song: String::new(),
+            current_focus_panel: FocusPanel::PlaylistOutside,
             playlist_ui: UIList::default(),
             song_ui: Paragraph::new("this is a song")
                 .block(Block::default().title("Song name").borders(Borders::ALL))
@@ -51,36 +60,6 @@ impl<'a> MainScreen<'a> {
 }
 
 impl<'a> Controller for MainScreen<'a> {
-    async fn handle_event(&mut self, cmd: Command) -> Result<()> {
-        let list_len = self.playlist_ui.list.len();
-        if list_len == 0 { return Ok(()); }
-
-        let list_state = &mut self.playlist_ui.state;
-        let mut selected = list_state.selected().unwrap_or_default();
-
-        match cmd {
-            Command::Up => {
-                if selected == 0 {
-                    selected = list_len - 1;
-                } else {
-                    selected -= 1;
-                }
-            },
-            Command::Down => {
-                if selected == list_len - 1 {
-                    selected = 0;
-                } else {
-                    selected += 1;
-                }
-            },
-            _ => {},
-        };
-
-        self.playlist_ui.state.select(Some(selected));
-
-        Ok(())
-    }
-
     async fn update_model(&mut self) -> Result<bool> {
         let mut result = Ok(false);
 
@@ -93,21 +72,78 @@ impl<'a> Controller for MainScreen<'a> {
             result = Ok(true);
         }
 
+        if self.playlist_ui.state.selected() == None {
+            self.playlist_ui.state.select(Some(0));
+            result = Ok(true);
+        }
+
         result
+    }
+
+    async fn handle_event(&mut self, cmd: Command) -> Result<bool> {
+        match cmd {
+            Command::Esc => {
+                match self.current_focus_panel {
+                    FocusPanel::PlaylistInside => { self.current_focus_panel = FocusPanel::PlaylistOutside; },
+                    FocusPanel::LyricInside => { self.current_focus_panel = FocusPanel::LyricOutside; },
+                    _ => { return Ok(false); },
+                }
+            },
+            Command::Down | Command::Up => {
+                match self.current_focus_panel {
+                    FocusPanel::PlaylistOutside => { self.current_focus_panel = FocusPanel::PlaylistInside; },
+                    FocusPanel::LyricOutside => { self.current_focus_panel = FocusPanel::LyricInside; },
+                    FocusPanel::PlaylistInside => {
+                        let list_len = self.playlist_ui.list.len();
+                        if list_len == 0 { return Ok(false); }
+                        let list_state = &mut self.playlist_ui.state;
+                        let mut selected = list_state.selected().unwrap_or_default();
+                        match cmd {
+                            Command::Up => {
+                                if selected == 0 {
+                                    selected = list_len - 1;
+                                } else {
+                                    selected -= 1;
+                                }
+                            },
+                            Command::Down => {
+                                if selected == list_len - 1 {
+                                    selected = 0;
+                                } else {
+                                    selected += 1;
+                                }
+                            },
+                            _ => {}, // won't happen
+                        };
+
+                        self.playlist_ui.state.select(Some(selected));
+                    },
+                    FocusPanel::LyricInside => {},
+                }
+            },
+            _ => { return Ok(false); },
+        }
+
+        Ok(true)
     }
 
     fn update_view(&mut self, style: &Style) {
         self.playlist_ui = UIList {
-            list: List::new(self.playlist_items.clone())
-                .block(
-                    Block::default()
-                        .title(format!("Playlist: {}", self.playlist_name.clone()))
-                        .title_bottom(format!("User: {}", self.user_name.clone()))
-                        .borders(Borders::ALL)
-                )
-                .highlight_style(SELECTED_STYLE)
-                .highlight_symbol(">")
-                .style(*style),
+            list: {
+                let mut list = List::new(self.playlist_items.clone())
+                    .block(
+                        Block::default()
+                            .title(format!("Playlist: {}", self.playlist_name.clone()))
+                            .title_bottom(format!("User: {}", self.user_name.clone()))
+                            .borders(Borders::ALL)
+                    )
+                    .style(*style);
+                list = match self.current_focus_panel {
+                    FocusPanel::PlaylistInside => list.highlight_style(SELECTED_STYLE).highlight_symbol(">"),
+                    _ => list,
+                };
+                list
+            },
             state: mem::take(&mut self.playlist_ui.state),
         };
     }

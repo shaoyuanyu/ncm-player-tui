@@ -26,12 +26,12 @@ impl<'a> PlaylistScreen<'a> {
 }
 
 impl<'a> Controller for PlaylistScreen<'a> {
-    async fn handle_event(&mut self, _cmd: Command) -> Result<()> {
+    async fn update_model(&mut self) -> Result<bool> {
         todo!()
     }
 
-    async fn update_model(&mut self) -> Result<bool> {
-        todo!()
+    async fn handle_event(&mut self, _cmd: Command) -> Result<bool> {
+        Ok(false)
     }
 
     fn update_view(&mut self, _style: &Style) {

@@ -51,10 +51,6 @@ impl<'a> LoginScreen<'a> {
 }
 
 impl<'a> Controller for LoginScreen<'a> {
-    async fn handle_event(&mut self, _cmd: Command) -> Result<()> {
-        Ok(())
-    }
-
     async fn update_model(&mut self) -> Result<bool> {
         if self.login_url == "" || self.login_unikey == "" {
             self.create_login_qr().await?;
@@ -84,6 +80,10 @@ impl<'a> Controller for LoginScreen<'a> {
         }
 
         Ok(true)
+    }
+
+    async fn handle_event(&mut self, _cmd: Command) -> Result<bool> {
+        Ok(false)
     }
 
     fn update_view(&mut self, style: &Style) {

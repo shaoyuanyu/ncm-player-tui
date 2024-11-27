@@ -54,12 +54,12 @@ impl<'a> CommandLine<'a> {
 }
 
 impl<'a> Controller for CommandLine<'a> {
-    async fn handle_event(&mut self, _cmd: Command) -> anyhow::Result<()> {
-        Ok(())
-    }
-
     async fn update_model(&mut self) -> anyhow::Result<bool> {
         Ok(true)
+    }
+
+    async fn handle_event(&mut self, _cmd: Command) -> anyhow::Result<bool> {
+        Ok(false)
     }
 
     fn update_view(&mut self, style: &Style) {

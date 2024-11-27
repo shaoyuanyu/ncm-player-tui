@@ -55,14 +55,14 @@ async fn main() -> Result<()> {
         app.lock().await
             .update_model().await?;
 
-        app.lock().await
-            .draw()?;
-
         if event::poll(POLL_DURATION)? {
             if !app.lock().await.handle_event().await? {
                 return app.lock().await.restore_terminal();
             }
         }
+
+        app.lock().await
+            .draw()?;
     }
 }
 
