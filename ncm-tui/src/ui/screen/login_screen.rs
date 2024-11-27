@@ -1,3 +1,4 @@
+use crate::config::Command;
 use crate::ui::Controller;
 use crate::NCM_API;
 use anyhow::Result;
@@ -6,7 +7,6 @@ use ratatui::{
     prelude::*,
     widgets::{Block, Borders, Paragraph},
 };
-use crate::config::Command;
 
 pub struct LoginScreen<'a> {
     // model

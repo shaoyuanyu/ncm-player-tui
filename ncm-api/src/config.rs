@@ -24,8 +24,6 @@ pub const USER_AGENT_LIST: [&str; 14] = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.135 Safari/537.36 Edge/13.1058",
 ];
 
-pub const COOKIE_FILE: &str = "cookies.json";
-
 pub const BASE_URL_LIST: [&str; 12] = [
     "https://music.163.com/",
     "https://music.163.com/eapi/clientlog",
@@ -40,3 +38,5 @@ pub const BASE_URL_LIST: [&str; 12] = [
     "https://music.163.com/wapi/feedback",
     "https://music.163.com/openapi/clientlog",
 ];
+
+pub const DEFAULT_RATE: u32 = 1900000;

@@ -1,8 +1,8 @@
+use crate::config::Command;
 use crate::ui::Controller;
 use ratatui::prelude::*;
 use tui_textarea::{CursorMove, TextArea};
 use unicode_width::UnicodeWidthStr;
-use crate::config::Command;
 
 #[derive(Default)]
 pub struct CommandLine<'a> {

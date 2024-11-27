@@ -1,14 +1,27 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
+pub mod track;
+
+use crate::track::Track;
+use std::time::Duration;
+
+#[derive(PartialEq, Eq, Copy, Clone)]
+pub enum Repeat {
+    On,
+    Off,
+    One,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+impl Default for Repeat {
+    fn default() -> Self {
+        Self::Off
     }
+}
+
+#[derive(Default)]
+pub struct MediaState {
+    pub current_track: Option<Track>,
+    pub current_track_progress: Option<Duration>,
+    pub playing: bool,
+    pub stopped: bool,
+    pub shuffle: bool,
+    pub repeat: Repeat,
 }

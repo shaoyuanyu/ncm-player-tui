@@ -1,16 +1,11 @@
+use crate::config::Command;
+use crate::ui::widget::UIList;
+use crate::ui::Controller;
 use anyhow::Result;
-use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::prelude::Style;
-use ratatui::widgets::{Paragraph};
-use crate::config::Command;
-use crate::ui::Controller;
-use crate::ui::widget::UIList;
-
-enum Panel {
-    Playlists,
-    Tracks,
-}
+use ratatui::widgets::Paragraph;
+use ratatui::Frame;
 
 pub struct PlaylistScreen<'a> {
     //
@@ -19,11 +14,9 @@ pub struct PlaylistScreen<'a> {
     //
     playlist_list: UIList<'a>,
     track_page: Paragraph<'a>,
-    panel: Panel,
 }
 
-impl<'a> PlaylistScreen<'a> {
-}
+impl<'a> PlaylistScreen<'a> {}
 
 impl<'a> Controller for PlaylistScreen<'a> {
     async fn update_model(&mut self) -> Result<bool> {

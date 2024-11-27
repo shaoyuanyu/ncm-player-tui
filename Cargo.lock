@@ -1345,6 +1345,9 @@ dependencies = [
 [[package]]
 name = "ncm-play"
 version = "0.1.0"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "ncm-tui"
@@ -1358,6 +1361,7 @@ dependencies = [
  "log",
  "mpris-server",
  "ncm-api",
+ "ncm-play",
  "ratatui",
  "serde",
  "serde_yml",

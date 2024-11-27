@@ -4,9 +4,9 @@ pub mod widget;
 
 pub use app::App;
 
+use crate::config::Command;
 use anyhow::Result;
 use ratatui::prelude::*;
-use crate::config::Command;
 
 trait Controller {
     /// model 未变化的情况下返回 false，此时程序无需重新更新 view

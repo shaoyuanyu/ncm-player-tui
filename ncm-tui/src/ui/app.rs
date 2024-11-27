@@ -1,3 +1,4 @@
+use crate::ui::widget::CommandLine;
 use crate::{
     config::{AppMode, Command, ScreenEnum},
     ui::{screen::*, Controller},
@@ -11,30 +12,27 @@ use crossterm::{
     terminal::{disable_raw_mode, LeaveAlternateScreen},
 };
 use ratatui::prelude::*;
+use ratatui::widgets::{Block, Borders, Gauge};
 use std::collections::VecDeque;
 use std::io::Stdout;
-use crate::ui::widget::CommandLine;
 
 pub struct App<'a> {
-    // composable
+    // model
+    current_screen: ScreenEnum,
+    current_mode: AppMode,
+    need_re_update_view: bool,
+    command_queue: VecDeque<Command>,
+
+    // view
     main_screen: MainScreen<'a>,
     // playlist_screen: PlaylistScreen<'a>,
     login_screen: LoginScreen<'a>,
     help_screen: HelpScreen<'a>,
     command_line: CommandLine<'a>,
+    playback_bar: Gauge<'a>,
 
-    // app 状态
-    current_screen: ScreenEnum,
-    current_mode: AppMode,
-    need_reupdate_view: bool,
-
-    //
+    // const
     terminal: Terminal<CrosstermBackend<Stdout>>,
-
-    //
-    command_queue: VecDeque<Command>,
-
-    //
     normal_style: Style,
 }
 
@@ -42,19 +40,63 @@ pub struct App<'a> {
 impl<'a> App<'a> {
     pub fn new(terminal: Terminal<CrosstermBackend<Stdout>>) -> Self {
         let normal_style = Style::default();
+        let playback_bar = Gauge::default()
+            .block(Block::default().borders(Borders::ALL))
+            .gauge_style(normal_style)
+            .ratio(0.0)
+            .label("--:--/--:--");
 
         Self {
+            current_screen: ScreenEnum::Main,
+            current_mode: AppMode::Normal,
+            need_re_update_view: true,
+            command_queue: VecDeque::new(),
             main_screen: MainScreen::new(&normal_style),
             login_screen: LoginScreen::new(&normal_style),
             help_screen: HelpScreen::new(&normal_style),
             command_line: CommandLine::new(&normal_style),
-            current_screen: ScreenEnum::Main,
-            current_mode: AppMode::Normal,
-            need_reupdate_view: true,
+            playback_bar,
             terminal,
-            command_queue: VecDeque::new(),
             normal_style,
         }
+    }
+
+    /// cookie 登录/二维码登录后均调用
+    pub async fn init_after_login(&mut self) -> Result<()> {
+        let ncm_api_guard = NCM_API.lock().await;
+
+        self.main_screen = MainScreen::new(&self.normal_style); // &normal_style
+                                                                // self.playlist_screen = PlaylistScreen::new(&normal_style);
+
+        if let (Some(playlist_name), Some(playlist)) = ncm_api_guard.user_favorite_songlist() {
+            self.main_screen
+                .update_playlist_model(playlist_name, playlist);
+        }
+
+        self.switch_screen(ScreenEnum::Main).await;
+
+        Ok(())
+    }
+
+    pub fn restore_terminal(&mut self) -> Result<()> {
+        disable_raw_mode()?;
+        execute!(self.terminal.backend_mut(), LeaveAlternateScreen)?;
+        self.terminal.show_cursor()?;
+
+        Ok(())
+    }
+}
+
+/// Controller
+impl<'a> App<'a> {
+    pub async fn update_model(&mut self) -> Result<()> {
+        self.need_re_update_view = match self.current_screen {
+            ScreenEnum::Help => false,
+            ScreenEnum::Login => self.update_login_model().await?,
+            ScreenEnum::Main => self.main_screen.update_model().await?,
+        };
+
+        Ok(())
     }
 
     pub async fn handle_event(&mut self) -> Result<bool> {
@@ -86,46 +128,36 @@ impl<'a> App<'a> {
             match cmd {
                 Command::Quit => {
                     return Ok(false);
-                },
+                }
                 Command::GotoScreen(to_screen) => {
                     self.switch_screen(to_screen).await;
-                },
+                }
                 Command::EnterCommand => {
                     self.switch_to_command_entry_mode();
                     self.command_line.reset();
                     self.command_line.set_prompt(":");
-                },
+                }
                 Command::Logout => {
                     self.login_screen = LoginScreen::new(&self.normal_style);
                     // TODO: 清除 cache
-                    NCM_API.lock().await
-                        .logout().await;
-                },
+                    NCM_API.lock().await.logout().await;
+                }
                 // 需要向下传递的事件
-                Command::Down | Command::Up | Command::Esc => {
+                Command::Down | Command::Up | Command::NextPanel | Command::PrevPanel | Command::Esc | Command::Play => {
                     // 先 update_model(), 再 handle_event()
                     // 取或值
-                    self.need_reupdate_view = match self.current_screen {
-                        ScreenEnum::Main => self.main_screen.handle_event(cmd).await?,
-                        ScreenEnum::Login => self.login_screen.handle_event(cmd).await?,
-                        ScreenEnum::Help => self.help_screen.handle_event(cmd).await?,
-                    } || self.need_reupdate_view;
-                },
-                _ => {},
+                    self.need_re_update_view = self.need_re_update_view
+                        || match self.current_screen {
+                            ScreenEnum::Main => self.main_screen.handle_event(cmd).await?,
+                            ScreenEnum::Login => self.login_screen.handle_event(cmd).await?,
+                            ScreenEnum::Help => self.help_screen.handle_event(cmd).await?,
+                        };
+                }
+                _ => {}
             }
         }
 
         Ok(true)
-    }
-
-    pub async fn update_model(&mut self) -> Result<()> {
-        self.need_reupdate_view = match self.current_screen {
-            ScreenEnum::Help => false,
-            ScreenEnum::Login => self.update_login_model().await?,
-            ScreenEnum::Main => self.main_screen.update_model().await?,
-        };
-
-        Ok(())
     }
 
     pub fn update_view(&mut self) {
@@ -138,7 +170,7 @@ impl<'a> App<'a> {
 
     pub fn draw(&mut self) -> Result<()> {
         //
-        if self.need_reupdate_view {
+        if self.need_re_update_view {
             self.update_view();
         }
 
@@ -157,14 +189,21 @@ impl<'a> App<'a> {
                 )
                 .split(frame.area());
 
-            //
+            // render screen
             match self.current_screen {
                 ScreenEnum::Help => self.help_screen.draw(frame, chunks[0]),
                 ScreenEnum::Login => self.login_screen.draw(frame, chunks[0]),
                 ScreenEnum::Main => self.main_screen.draw(frame, chunks[0]),
             }
 
-            //
+            // render info_widget & playback_bar
+            let playback_chunk = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Length(26), Constraint::Min(3)].as_ref())
+                .split(chunks[1]);
+            frame.render_widget(&self.playback_bar, playback_chunk[1]);
+
+            // render command_line
             let show_cursor = match self.current_mode {
                 AppMode::Normal => false,
                 AppMode::CommandEntry => true,
@@ -173,14 +212,6 @@ impl<'a> App<'a> {
             self.command_line.update_view(&self.normal_style);
             self.command_line.draw(frame, chunks[2]);
         })?;
-
-        Ok(())
-    }
-
-    pub fn restore_terminal(&mut self) -> Result<()> {
-        disable_raw_mode()?;
-        execute!(self.terminal.backend_mut(), LeaveAlternateScreen)?;
-        self.terminal.show_cursor()?;
 
         Ok(())
     }
@@ -197,13 +228,16 @@ impl<'a> App<'a> {
             KeyCode::Char(' ') => Command::TogglePlay,
             KeyCode::Char(',') => Command::PrevTrack,
             KeyCode::Char('.') => Command::NextTrack,
-            KeyCode::Enter => Command::QueueAndPlay,
+            // KeyCode::Enter => Command::QueueAndPlay,
+            KeyCode::Enter => Command::Play,
             KeyCode::Esc => Command::Esc,
             KeyCode::Char('r') => Command::ToggleRepeat,
             KeyCode::Char('s') => Command::ToggleShuffle,
             KeyCode::Char('g') => Command::GotoTop,
             KeyCode::Char('G') => Command::GotoBottom,
+            KeyCode::Right => Command::NextPanel,
             KeyCode::Tab => Command::NextPanel,
+            KeyCode::Left => Command::PrevPanel,
             KeyCode::BackTab => Command::PrevPanel,
             KeyCode::Char('1') => Command::GotoScreen(ScreenEnum::Main),
             // KeyCode::Char('2') => Command::GotoScreen(ScreenEnum::Playlists),
@@ -260,33 +294,13 @@ impl<'a> App<'a> {
         }
     }
 
-    /// cookie 登录/二维码登录后均调用
-    pub async fn init_after_login(&mut self) -> Result<()> {
-        let ncm_api_guard = NCM_API.lock().await;
-
-        let playlist_name = ncm_api_guard.user_favorite_songlist_name.clone();
-        let play_name_list = ncm_api_guard.user_favorite_songlist.clone()
-            .unwrap()
-            .iter()
-            .map(|song_info| song_info.name.clone())
-            .collect();
-
-        self.main_screen = MainScreen::new(&self.normal_style); // &normal_style
-        self.main_screen.update_playlist_model(playlist_name, play_name_list);
-        // self.playlist_screen = PlaylistScreen::new(&normal_style);
-
-        self.switch_screen(ScreenEnum::Main).await;
-
-        Ok(())
-    }
-
     async fn switch_screen(&mut self, to_screen: ScreenEnum) {
         if to_screen == ScreenEnum::Login && NCM_API.lock().await.is_login() {
             self.show_prompt("you have to logout from current account first!");
             return;
         }
 
-        self.need_reupdate_view = true;
+        self.need_re_update_view = true;
         self.current_screen = to_screen;
     }
 }
