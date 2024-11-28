@@ -4,6 +4,10 @@
 
 tui 界面基于 `ratatui` crate 开发。
 
+## 依赖
+
+Gstreamer
+
 ## 参考项目
 
 ### api 参考：
