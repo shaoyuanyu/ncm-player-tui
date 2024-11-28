@@ -1,17 +1,19 @@
 use crate::config::Command;
 use crate::ui::widget::UIList;
 use crate::ui::Controller;
-use crate::NCM_API;
+use crate::{NCM_API, PLAYER};
 use anyhow::Result;
+use itertools::Itertools;
 use ncm_api::SongInfo;
 use ratatui::layout::Rect;
 use ratatui::prelude::*;
-use ratatui::style::palette::tailwind::SLATE;
+use ratatui::style::palette::tailwind::{RED, SLATE};
 use ratatui::widgets::{Block, Borders, HighlightSpacing, List, ListItem};
 use ratatui::Frame;
 use std::mem;
 
-const SELECTED_STYLE: Style = Style::new().bg(SLATE.c800).add_modifier(Modifier::BOLD);
+const PLAYLIST_SELECTED_STYLE: Style = Style::new().bg(SLATE.c800).add_modifier(Modifier::BOLD);
+const LYRIC_SELECTED_STYLE: Style = Style::new().fg(RED.c600).add_modifier(Modifier::BOLD);
 
 pub enum FocusPanel {
     PlaylistOutside,
@@ -30,13 +32,12 @@ pub struct MainScreen<'a> {
     playlist_items: Vec<ListItem<'a>>,
     //
     current_song_info: Option<SongInfo>,
-    current_song_lyric_timestamps: Option<Vec<u64>>,
-    current_song_lyric_lines: Option<Vec<String>>,
+    current_song_lyric_timestamps: Option<Vec<u64>>, // 单位: ms
+    current_song_lyric_timestamp_index: Option<usize>,
     current_song_lyric_items: Vec<ListItem<'a>>,
 
     // view
     playlist_ui: UIList<'a>,
-    // song_ui: Paragraph<'a>,
     song_ui: UIList<'a>,
 }
 
@@ -50,7 +51,7 @@ impl<'a> MainScreen<'a> {
             playlist_items: Vec::new(),
             current_song_info: None,
             current_song_lyric_timestamps: None,
-            current_song_lyric_lines: None,
+            current_song_lyric_timestamp_index: None,
             current_song_lyric_items: Vec::new(),
             playlist_ui: UIList::default(),
             song_ui: UIList::default(),
@@ -77,19 +78,60 @@ impl<'a> MainScreen<'a> {
         self.current_song_info = Some(song_info.clone());
 
         // 更新歌词
-        let current_song_lyric = ncm_api_guard.song_lyric(song_info).await?;
-        let mut current_song_lyric_timestamps = Vec::new();
-        let mut current_song_lyric_lines = Vec::new();
-        for (lyric_timestamp, lyric_line) in current_song_lyric {
-            current_song_lyric_timestamps.push(lyric_timestamp);
-            current_song_lyric_lines.push(lyric_line);
+        if let Ok(current_song_lyric) = ncm_api_guard.song_lyric(song_info.clone()).await {
+            let mut current_song_lyric_timestamps = Vec::new();
+            let mut current_song_lyric_lines = Vec::new();
+            for (lyric_timestamp, lyric_line) in current_song_lyric {
+                current_song_lyric_timestamps.push(lyric_timestamp);
+                current_song_lyric_lines.push(lyric_line);
+            }
+            //
+            let mut current_song_lyric_timestamps_formated = Vec::new();
+            self.current_song_lyric_items = Vec::new();
+            //
+            for (prev, curr, next) in current_song_lyric_timestamps
+                .iter()
+                .zip(current_song_lyric_lines.iter())
+                .tuple_windows()
+            {
+                if curr.0 == next.0 {
+                    // 下句是本句的翻译
+                    current_song_lyric_timestamps_formated.push(curr.0.clone());
+                    self.current_song_lyric_items
+                        .push(ListItem::new(Text::from(vec![
+                            Line::from(format!("{}", curr.1)).centered(),
+                            Line::from(format!("{}", next.1)).centered(),
+                        ])));
+                } else if prev.0 == curr.0 {
+                    // 本句是上句的翻译
+                    // do nothing
+                } else {
+                    // 无翻译
+                    current_song_lyric_timestamps_formated.push(curr.0.clone());
+                    self.current_song_lyric_items.push(ListItem::new(Text::from(
+                        Line::from(format!("{}", curr.1)).centered(),
+                    )));
+                }
+            }
+            //
+            self.current_song_lyric_timestamp_index = Some(0);
+            self.current_song_lyric_timestamps = Some(current_song_lyric_timestamps_formated);
+        } else {
+            // 获取歌词失败（纯音乐或网络波动）
+            self.current_song_lyric_timestamp_index = Some(0);
+            self.current_song_lyric_timestamps = Some(vec![0]);
+            self.current_song_lyric_items = Vec::new();
+            self.current_song_lyric_items.push(ListItem::new(Text::from(
+                Line::from("无歌词，请欣赏").centered(),
+            )));
         }
-        self.current_song_lyric_timestamps = Some(current_song_lyric_timestamps);
-        self.current_song_lyric_lines = Some(current_song_lyric_lines.clone());
-        self.current_song_lyric_items = current_song_lyric_lines
-            .iter()
-            .map(move |lyric_line| ListItem::new(Line::from(lyric_line.clone()).centered()))
-            .collect();
+
+        // player
+        let player_guard = PLAYER.lock().await;
+        player_guard.stop();
+        player_guard.set_uri(Some(song_info.song_url.as_str()));
+        player_guard.set_volume(0.2);
+        player_guard.play();
 
         Ok(())
     }
@@ -108,14 +150,31 @@ impl<'a> Controller for MainScreen<'a> {
             result = Ok(true);
         }
 
-        if self.playlist_ui.state.selected() == None {
-            self.playlist_ui.state.select(Some(0));
-            result = Ok(true);
-        }
+        // lyric
+        if let Some(current_player_position) = PLAYER.lock().await.position() {
+            if let Some(current_lyric_index) = self.current_song_lyric_timestamp_index {
+                // 注意歌词 index 越界问题
+                if current_lyric_index
+                    < self.current_song_lyric_timestamps.as_ref().unwrap().len() - 1
+                {
+                    let next_lyric_timestamp = self.current_song_lyric_timestamps.as_ref().unwrap()
+                        [current_lyric_index + 1]
+                        .clone();
 
-        if self.song_ui.state.selected() == None {
-            self.song_ui.state.select(Some(10)); // TODO: 计算居中歌词
-            result = Ok(true);
+                    // 切换到下一句歌词
+                    if current_player_position.mseconds() >= next_lyric_timestamp {
+                        self.current_song_lyric_timestamp_index = self
+                            .current_song_lyric_timestamp_index
+                            .map(|index| index + 1);
+
+                        self.song_ui
+                            .state
+                            .select(Some(self.current_song_lyric_timestamp_index.unwrap()));
+
+                        result = Ok(true);
+                    }
+                }
+            }
         }
 
         result
@@ -142,28 +201,18 @@ impl<'a> Controller for MainScreen<'a> {
                     self.current_focus_panel = FocusPanel::LyricInside;
                 }
                 FocusPanel::PlaylistInside => {
-                    let list_len = self.playlist_ui.list.len();
-                    if list_len == 0 {
-                        return Ok(false);
+                    match cmd {
+                        Command::Down => self.playlist_ui.state.select_next(),
+                        Command::Up => self.playlist_ui.state.select_previous(),
+                        _ => {} // never happen
                     }
-                    let list_state = &mut self.playlist_ui.state;
-                    let mut selected = list_state.selected().unwrap_or_default();
-
-                    selected = switch_line(&cmd, selected, list_len);
-
-                    self.playlist_ui.state.select(Some(selected));
                 }
                 FocusPanel::LyricInside => {
-                    let list_len = self.song_ui.list.len();
-                    if list_len == 0 {
-                        return Ok(false);
+                    match cmd {
+                        Command::Down => self.song_ui.state.select_next(),
+                        Command::Up => self.song_ui.state.select_previous(),
+                        _ => {} // never happen
                     }
-                    let list_state = &mut self.song_ui.state;
-                    let mut selected = list_state.selected().unwrap_or_default();
-
-                    selected = switch_line_no_back(&cmd, selected, list_len);
-
-                    self.song_ui.state.select(Some(selected));
                 }
             },
             Command::NextPanel => match self.current_focus_panel {
@@ -226,15 +275,18 @@ impl<'a> Controller for MainScreen<'a> {
                     )
                     .style(*style);
                 list = match self.current_focus_panel {
-                    FocusPanel::PlaylistInside => {
-                        list.highlight_style(SELECTED_STYLE).highlight_symbol(">")
-                    }
+                    FocusPanel::PlaylistInside => list
+                        .highlight_style(PLAYLIST_SELECTED_STYLE)
+                        .highlight_symbol(">"),
                     _ => list,
                 };
                 list
             },
             state: mem::take(&mut self.playlist_ui.state),
         };
+        if self.playlist_ui.state.selected() == None {
+            self.playlist_ui.state.select(Some(0));
+        }
 
         self.song_ui = UIList {
             list: {
@@ -262,20 +314,26 @@ impl<'a> Controller for MainScreen<'a> {
                             .borders(Borders::ALL),
                     ),
                 };
-                list = match self.current_focus_panel {
-                    FocusPanel::LyricInside => list
-                        .highlight_style(SELECTED_STYLE)
-                        .highlight_spacing(HighlightSpacing::WhenSelected),
-                    _ => list,
-                };
+                // list = match self.current_focus_panel {
+                //     FocusPanel::LyricInside => list
+                //         .highlight_style(LYRIC_SELECTED_STYLE)
+                //         .highlight_spacing(HighlightSpacing::WhenSelected),
+                //     _ => list,
+                // };
+                list = list
+                    .highlight_style(LYRIC_SELECTED_STYLE)
+                    .highlight_spacing(HighlightSpacing::WhenSelected);
                 list
             },
             state: mem::take(&mut self.song_ui.state),
+        };
+        if self.song_ui.state.selected() == None {
+            self.song_ui.state.select(Some(0));
         }
     }
 
     fn draw(&self, frame: &mut Frame, chunk: Rect) {
-        // Split the screen into left and right halves
+        // 分为左右两个面板
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
@@ -287,46 +345,31 @@ impl<'a> Controller for MainScreen<'a> {
 
         // 在右半屏渲染 current_song
         let mut song_ui_state = self.song_ui.state.clone();
+        // 歌词居中
+        if !self.current_song_lyric_items.is_empty() && self.current_song_lyric_items.len() != 1 {
+            let current_index = song_ui_state.selected().unwrap();
+            // 可显示行数
+            let available_line_count = chunks[1].height as usize;
+            // 一句歌词所占行数（带翻译的歌词会占2行）
+            let lyric_line_count = self
+                .current_song_lyric_items
+                .get(current_index)
+                .unwrap()
+                .height();
+            let half_line_count = available_line_count / lyric_line_count / 2;
+            let near_top_line = 0 + half_line_count;
+            let near_bottom_line = self.current_song_lyric_items.len() - 1 - half_line_count;
+            // 修正 offset
+            if current_index >= near_top_line {
+                if current_index >= near_bottom_line {
+                    // 接近底部时取消滚动，不居中
+                    *song_ui_state.offset_mut() = near_bottom_line - half_line_count;
+                } else {
+                    // 动态居中
+                    *song_ui_state.offset_mut() = current_index - half_line_count;
+                }
+            }
+        }
         frame.render_stateful_widget(&self.song_ui.list, chunks[1], &mut song_ui_state);
     }
-}
-
-fn switch_line(cmd: &Command, mut selected: usize, list_len: usize) -> usize {
-    match cmd {
-        Command::Up => {
-            if selected == 0 {
-                selected = list_len - 1;
-            } else {
-                selected -= 1;
-            }
-        }
-        Command::Down => {
-            if selected == list_len - 1 {
-                selected = 0;
-            } else {
-                selected += 1;
-            }
-        }
-        _ => {} // won't happen
-    }
-
-    selected
-}
-
-fn switch_line_no_back(cmd: &Command, mut selected: usize, list_len: usize) -> usize {
-    match cmd {
-        Command::Up => {
-            if selected != 0 {
-                selected -= 1;
-            }
-        }
-        Command::Down => {
-            if selected != list_len - 1 {
-                selected += 1;
-            }
-        }
-        _ => {} // won't happen
-    }
-
-    selected
 }

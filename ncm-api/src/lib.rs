@@ -331,10 +331,9 @@ impl NcmApi {
         translation_lyric_path.push(format!("{}.tlrc", si.id));
 
         // 替换歌词时间
-        let re = Regex::new(r"\[\d+:\d+.\d+]")?;
-
+        let re = regex::Regex::new(r"\[\d+:\d+.\d+\]")?;
         // 修正不正常的时间戳 [00:11:22]
-        let re_abnormal_ts = Regex::new(r"^\[(\d+):(\d+):(\d+)]")?;
+        let re_abnormal_ts = regex::Regex::new(r"^\[(\d+):(\d+):(\d+)\]")?;
 
         if !lyric_path.exists() {
             if let Ok(lyr) = self.get_song_lyric(si.id).await {
