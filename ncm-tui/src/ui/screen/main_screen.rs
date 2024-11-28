@@ -150,7 +150,7 @@ impl<'a> Controller for MainScreen<'a> {
             result = Ok(true);
         }
 
-        // lyric
+        // lyric 歌词推进
         if let Some(current_player_position) = PLAYER.lock().await.position() {
             if let Some(current_lyric_index) = self.current_song_lyric_timestamp_index {
                 // 注意歌词 index 越界问题
@@ -270,7 +270,7 @@ impl<'a> Controller for MainScreen<'a> {
                     .block(
                         Block::default()
                             .title(format!("Playlist: {}", self.playlist_name.clone()))
-                            .title_bottom(format!("User: {}", self.user_name.clone()))
+                            .title_bottom(Line::from(format!("User: {}", self.user_name.clone())).right_aligned())
                             .borders(Borders::ALL),
                     )
                     .style(*style);

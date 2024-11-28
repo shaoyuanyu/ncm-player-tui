@@ -2,7 +2,7 @@ use crate::ui::widget::CommandLine;
 use crate::{
     config::{AppMode, Command, ScreenEnum},
     ui::{screen::*, Controller},
-    NCM_API,
+    NCM_API, PLAYER,
 };
 use anyhow::Result;
 use crossterm::{
@@ -90,11 +90,26 @@ impl<'a> App<'a> {
 /// Controller
 impl<'a> App<'a> {
     pub async fn update_model(&mut self) -> Result<()> {
+        // screen
         self.need_re_update_view = match self.current_screen {
             ScreenEnum::Help => false,
             ScreenEnum::Login => self.update_login_model().await?,
             ScreenEnum::Main => self.main_screen.update_model().await?,
         };
+
+        // playback_bar
+        let player_guard = PLAYER.lock().await;
+        if let Some(player_position) = player_guard.position() {
+            if let Some(player_duration) = player_guard.duration() {
+                self.playback_bar = self.playback_bar.clone().label(format!(
+                    "{:02}:{:02}/{:02}:{:02}",
+                    player_position.minutes(),
+                    player_position.seconds() % 60,
+                    player_duration.minutes(),
+                    player_duration.seconds() % 60,
+                ));
+            }
+        }
 
         Ok(())
     }
@@ -166,18 +181,27 @@ impl<'a> App<'a> {
     }
 
     pub fn update_view(&mut self) {
-        match self.current_screen {
-            ScreenEnum::Help => {}
-            ScreenEnum::Login => self.login_screen.update_view(&self.normal_style),
-            ScreenEnum::Main => self.main_screen.update_view(&self.normal_style),
+        // screen 只在 need_re_update_view 为 true 时更新view
+        if self.need_re_update_view {
+            match self.current_screen {
+                ScreenEnum::Help => {}
+                ScreenEnum::Login => self.login_screen.update_view(&self.normal_style),
+                ScreenEnum::Main => self.main_screen.update_view(&self.normal_style),
+            }
         }
+
+        // command_line
+        let show_cursor = match self.current_mode {
+            AppMode::Normal => false,
+            AppMode::CommandEntry => true,
+        };
+        self.command_line.set_cursor_visibility(show_cursor);
+        self.command_line.update_view(&self.normal_style);
     }
 
     pub fn draw(&mut self) -> Result<()> {
         //
-        if self.need_re_update_view {
-            self.update_view();
-        }
+        self.update_view();
 
         //
         self.terminal.draw(|frame| {
@@ -209,12 +233,6 @@ impl<'a> App<'a> {
             frame.render_widget(&self.playback_bar, playback_chunk[1]);
 
             // render command_line
-            let show_cursor = match self.current_mode {
-                AppMode::Normal => false,
-                AppMode::CommandEntry => true,
-            };
-            self.command_line.set_cursor_visibility(show_cursor);
-            self.command_line.update_view(&self.normal_style);
             self.command_line.draw(frame, chunks[2]);
         })?;
 
