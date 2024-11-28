@@ -143,7 +143,12 @@ impl<'a> App<'a> {
                     NCM_API.lock().await.logout().await;
                 }
                 // 需要向下传递的事件
-                Command::Down | Command::Up | Command::NextPanel | Command::PrevPanel | Command::Esc | Command::Play => {
+                Command::Down
+                | Command::Up
+                | Command::NextPanel
+                | Command::PrevPanel
+                | Command::Esc
+                | Command::Play => {
                     // 先 update_model(), 再 handle_event()
                     // 取或值
                     self.need_re_update_view = self.need_re_update_view

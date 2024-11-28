@@ -134,52 +134,58 @@ impl<'a> Controller for MainScreen<'a> {
                     return Ok(false);
                 }
             },
-            Command::Down | Command::Up => {
-                match self.current_focus_panel {
-                    FocusPanel::PlaylistOutside => {
-                        self.current_focus_panel = FocusPanel::PlaylistInside;
+            Command::Down | Command::Up => match self.current_focus_panel {
+                FocusPanel::PlaylistOutside => {
+                    self.current_focus_panel = FocusPanel::PlaylistInside;
+                }
+                FocusPanel::LyricOutside => {
+                    self.current_focus_panel = FocusPanel::LyricInside;
+                }
+                FocusPanel::PlaylistInside => {
+                    let list_len = self.playlist_ui.list.len();
+                    if list_len == 0 {
+                        return Ok(false);
                     }
-                    FocusPanel::LyricOutside => {
-                        self.current_focus_panel = FocusPanel::LyricInside;
+                    let list_state = &mut self.playlist_ui.state;
+                    let mut selected = list_state.selected().unwrap_or_default();
+
+                    selected = switch_line(&cmd, selected, list_len);
+
+                    self.playlist_ui.state.select(Some(selected));
+                }
+                FocusPanel::LyricInside => {
+                    let list_len = self.song_ui.list.len();
+                    if list_len == 0 {
+                        return Ok(false);
                     }
-                    FocusPanel::PlaylistInside => {
-                        let list_len = self.playlist_ui.list.len();
-                        if list_len == 0 {
-                            return Ok(false);
-                        }
-                        let list_state = &mut self.playlist_ui.state;
-                        let mut selected = list_state.selected().unwrap_or_default();
+                    let list_state = &mut self.song_ui.state;
+                    let mut selected = list_state.selected().unwrap_or_default();
 
-                        selected = switch_line(&cmd, selected, list_len);
+                    selected = switch_line_no_back(&cmd, selected, list_len);
 
-                        self.playlist_ui.state.select(Some(selected));
-                    }
-                    FocusPanel::LyricInside => {
-                        let list_len = self.song_ui.list.len();
-                        if list_len == 0 {
-                            return Ok(false);
-                        }
-                        let list_state = &mut self.song_ui.state;
-                        let mut selected = list_state.selected().unwrap_or_default();
-
-                        selected = switch_line_no_back(&cmd, selected, list_len);
-
-                        self.song_ui.state.select(Some(selected));
-                    }
+                    self.song_ui.state.select(Some(selected));
                 }
             },
-            Command::NextPanel => {
-                match self.current_focus_panel {
-                    FocusPanel::PlaylistOutside => { self.current_focus_panel = FocusPanel::LyricOutside; },
-                    FocusPanel::LyricOutside => { return Ok(false); },
-                    _ => { return Ok(false); },
+            Command::NextPanel => match self.current_focus_panel {
+                FocusPanel::PlaylistOutside => {
+                    self.current_focus_panel = FocusPanel::LyricOutside;
+                }
+                FocusPanel::LyricOutside => {
+                    return Ok(false);
+                }
+                _ => {
+                    return Ok(false);
                 }
             },
-            Command::PrevPanel => {
-                match self.current_focus_panel {
-                    FocusPanel::PlaylistOutside => { return Ok(false); },
-                    FocusPanel::LyricOutside => { self.current_focus_panel = FocusPanel::PlaylistOutside; },
-                    _ => { return Ok(false); },
+            Command::PrevPanel => match self.current_focus_panel {
+                FocusPanel::PlaylistOutside => {
+                    return Ok(false);
+                }
+                FocusPanel::LyricOutside => {
+                    self.current_focus_panel = FocusPanel::PlaylistOutside;
+                }
+                _ => {
+                    return Ok(false);
                 }
             },
             Command::Play => match self.current_focus_panel {
@@ -220,7 +226,9 @@ impl<'a> Controller for MainScreen<'a> {
                     )
                     .style(*style);
                 list = match self.current_focus_panel {
-                    FocusPanel::PlaylistInside => list.highlight_style(SELECTED_STYLE).highlight_symbol(">"),
+                    FocusPanel::PlaylistInside => {
+                        list.highlight_style(SELECTED_STYLE).highlight_symbol(">")
+                    }
                     _ => list,
                 };
                 list
@@ -230,20 +238,34 @@ impl<'a> Controller for MainScreen<'a> {
 
         self.song_ui = UIList {
             list: {
-                let mut list = List::new(self.current_song_lyric_items.clone())
-                    .style(*style);
+                let mut list = List::new(self.current_song_lyric_items.clone()).style(*style);
                 list = match self.current_song_info.clone() {
                     Some(current_song_info) => list.block(
                         Block::default()
-                            .title(Line::from(format!("\u{1F3B5}{}", current_song_info.name)).left_aligned())
-                            .title(Line::from(format!("\u{1F3A4}{}", current_song_info.singer)).right_aligned())
-                            .title_bottom(Line::from(format!("\u{1F4DA}{}", current_song_info.album)).centered())
+                            .title(
+                                Line::from(format!("\u{1F3B5}{}", current_song_info.name))
+                                    .left_aligned(),
+                            )
+                            .title(
+                                Line::from(format!("\u{1F3A4}{}", current_song_info.singer))
+                                    .right_aligned(),
+                            )
+                            .title_bottom(
+                                Line::from(format!("\u{1F4DA}{}", current_song_info.album))
+                                    .centered(),
+                            )
                             .borders(Borders::ALL),
                     ),
-                    None => list.block(Block::default().title("\u{1F3B6}pick a song to play".to_string()).borders(Borders::ALL)),
+                    None => list.block(
+                        Block::default()
+                            .title("\u{1F3B6}pick a song to play".to_string())
+                            .borders(Borders::ALL),
+                    ),
                 };
                 list = match self.current_focus_panel {
-                    FocusPanel::LyricInside => list.highlight_style(SELECTED_STYLE).highlight_spacing(HighlightSpacing::WhenSelected),
+                    FocusPanel::LyricInside => list
+                        .highlight_style(SELECTED_STYLE)
+                        .highlight_spacing(HighlightSpacing::WhenSelected),
                     _ => list,
                 };
                 list
