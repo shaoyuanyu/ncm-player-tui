@@ -15,6 +15,7 @@ use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, Gauge};
 use std::collections::VecDeque;
 use std::io::Stdout;
+use ratatui::style::palette::tailwind;
 
 pub struct App<'a> {
     // model
@@ -42,7 +43,7 @@ impl<'a> App<'a> {
         let normal_style = Style::default();
         let playback_bar = Gauge::default()
             .block(Block::default().borders(Borders::ALL))
-            .gauge_style(normal_style)
+            .gauge_style(tailwind::PINK.c300)
             .ratio(0.0)
             .label("--:--/--:--");
 
@@ -65,8 +66,8 @@ impl<'a> App<'a> {
     pub async fn init_after_login(&mut self) -> Result<()> {
         let ncm_api_guard = NCM_API.lock().await;
 
-        self.main_screen = MainScreen::new(&self.normal_style); // &normal_style
-                                                                // self.playlist_screen = PlaylistScreen::new(&normal_style);
+        self.main_screen = MainScreen::new(&self.normal_style);
+        // self.playlist_screen = PlaylistScreen::new(&normal_style);
 
         if let (Some(playlist_name), Some(playlist)) = ncm_api_guard.user_favorite_songlist() {
             self.main_screen
@@ -101,13 +102,17 @@ impl<'a> App<'a> {
         let player_guard = PLAYER.lock().await;
         if let Some(player_position) = player_guard.position() {
             if let Some(player_duration) = player_guard.duration() {
-                self.playback_bar = self.playback_bar.clone().label(format!(
-                    "{:02}:{:02}/{:02}:{:02}",
-                    player_position.minutes(),
-                    player_position.seconds() % 60,
-                    player_duration.minutes(),
-                    player_duration.seconds() % 60,
-                ));
+                self.playback_bar = self
+                    .playback_bar
+                    .clone()
+                    .ratio(player_position.mseconds() as f64 / player_duration.mseconds() as f64)
+                    .label(format!(
+                        "{:02}:{:02}/{:02}:{:02}",
+                        player_position.minutes(),
+                        player_position.seconds() % 60,
+                        player_duration.minutes(),
+                        player_duration.seconds() % 60,
+                    ));
             }
         }
 
@@ -225,12 +230,12 @@ impl<'a> App<'a> {
                 ScreenEnum::Main => self.main_screen.draw(frame, chunks[0]),
             }
 
-            // render info_widget & playback_bar
-            let playback_chunk = Layout::default()
+            // 渲染 bottom_panel，包含 control_bar_1 & playback_bar & control_bar_2
+            let bottom_panel_chunks = Layout::default()
                 .direction(Direction::Horizontal)
-                .constraints([Constraint::Length(26), Constraint::Min(3)].as_ref())
+                .constraints([Constraint::Length(26), Constraint::Min(3), Constraint::Length(26)].as_ref())
                 .split(chunks[1]);
-            frame.render_widget(&self.playback_bar, playback_chunk[1]);
+            frame.render_widget(&self.playback_bar, bottom_panel_chunks[1]);
 
             // render command_line
             self.command_line.draw(frame, chunks[2]);

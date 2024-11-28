@@ -68,6 +68,9 @@ impl<'a> MainScreen<'a> {
             .iter()
             .map(|song| ListItem::new(song.name.clone()))
             .collect();
+
+        // 更新 playlist_ui selected，防止悬空
+        self.playlist_ui.state.select(None);
     }
 
     async fn play_song(&mut self, mut song_info: SongInfo) -> Result<()> {
@@ -125,6 +128,9 @@ impl<'a> MainScreen<'a> {
                 Line::from("无歌词，请欣赏").centered(),
             )));
         }
+
+        // 更新 song_ui selected，防止悬空
+        self.song_ui.state.select(None);
 
         // player
         let player_guard = PLAYER.lock().await;
@@ -269,8 +275,11 @@ impl<'a> Controller for MainScreen<'a> {
                 let mut list = List::new(self.playlist_items.clone())
                     .block(
                         Block::default()
-                            .title(format!("Playlist: {}", self.playlist_name.clone()))
-                            .title_bottom(Line::from(format!("User: {}", self.user_name.clone())).right_aligned())
+                            .title(format!("Playlist: {}\u{1F4DC}", self.playlist_name.clone()))
+                            .title_bottom(
+                                Line::from(format!("User: {}\u{1F3A7}", self.user_name.clone()))
+                                    .right_aligned(),
+                            )
                             .borders(Borders::ALL),
                     )
                     .style(*style);
@@ -346,7 +355,7 @@ impl<'a> Controller for MainScreen<'a> {
         // 在右半屏渲染 current_song
         let mut song_ui_state = self.song_ui.state.clone();
         // 歌词居中
-        if !self.current_song_lyric_items.is_empty() && self.current_song_lyric_items.len() != 1 {
+        if self.current_song_lyric_items.len() > 1 {
             let current_index = song_ui_state.selected().unwrap();
             // 可显示行数
             let available_line_count = chunks[1].height as usize;
