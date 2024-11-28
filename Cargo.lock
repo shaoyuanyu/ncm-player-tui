@@ -1578,6 +1578,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ncm-play"
+version = "0.1.0"
+dependencies = [
+ "gstreamer",
+ "gstreamer-play",
+]
+
+[[package]]
 name = "ncm-tui"
 version = "0.1.0"
 dependencies = [
@@ -1592,6 +1600,7 @@ dependencies = [
  "log",
  "mpris-server",
  "ncm-api",
+ "ncm-play",
  "ratatui",
  "serde",
  "serde_yml",

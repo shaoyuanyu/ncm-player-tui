@@ -9,6 +9,7 @@ use crossterm::{event, execute};
 use gstreamer_play::{gst, Play, PlayVideoRenderer};
 use lazy_static::lazy_static;
 use ncm_api::NcmApi;
+use ncm_play::Player;
 use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
 use std::io;
@@ -26,7 +27,7 @@ lazy_static! {
         PATH_CONFIG.lyrics.clone(),
         PATH_CONFIG.cache.clone(),
     )));
-    static ref PLAYER: Arc<Mutex<Play>> = Arc::new(Mutex::new(get_player()));
+    static ref PLAYER: Arc<Mutex<Player>> = Arc::new(Mutex::new(Player::new()));
 }
 
 #[tokio::main]
@@ -67,21 +68,21 @@ async fn main() -> Result<()> {
     }
 }
 
-fn get_player() -> Play {
-    gst::init().expect("Failed to initialize GST");
-
-    let player = Play::new(None::<PlayVideoRenderer>);
-    let mut config = player.config();
-    config.set_user_agent(
-        "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:100.0) Gecko/20100101 Firefox/100.0",
-    );
-    config.set_position_update_interval(250);
-    config.set_seek_accurate(true);
-    player.set_config(config).unwrap();
-    player.set_volume(0.0);
-
-    player
-}
+// fn get_player() -> Play {
+//     gst::init().expect("Failed to initialize GST");
+//
+//     let player = Play::new(None::<PlayVideoRenderer>);
+//     let mut config = player.config();
+//     config.set_user_agent(
+//         "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:100.0) Gecko/20100101 Firefox/100.0",
+//     );
+//     config.set_position_update_interval(250);
+//     config.set_seek_accurate(true);
+//     player.set_config(config).unwrap();
+//     player.set_volume(0.0);
+//
+//     player
+// }
 
 fn create_terminal() -> Result<Terminal<CrosstermBackend<io::Stdout>>> {
     enable_raw_mode()?;

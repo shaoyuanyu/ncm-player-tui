@@ -133,11 +133,8 @@ impl<'a> MainScreen<'a> {
         self.song_ui.state.select(None);
 
         // player
-        let player_guard = PLAYER.lock().await;
-        player_guard.stop();
-        player_guard.set_uri(Some(song_info.song_url.as_str()));
-        player_guard.set_volume(0.2);
-        player_guard.play();
+        let mut player_guard = PLAYER.lock().await;
+        player_guard.play_new_song_by_uri(song_info.song_url.as_str());
 
         Ok(())
     }

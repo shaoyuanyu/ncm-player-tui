@@ -1,4 +1,4 @@
-use crate::ui::widget::CommandLine;
+use crate::ui::widget::{BottomBar, CommandLine};
 use crate::{
     config::{AppMode, Command, ScreenEnum},
     ui::{screen::*, Controller},
@@ -12,10 +12,8 @@ use crossterm::{
     terminal::{disable_raw_mode, LeaveAlternateScreen},
 };
 use ratatui::prelude::*;
-use ratatui::widgets::{Block, Borders, Gauge};
 use std::collections::VecDeque;
 use std::io::Stdout;
-use ratatui::style::palette::tailwind;
 
 pub struct App<'a> {
     // model
@@ -30,7 +28,7 @@ pub struct App<'a> {
     login_screen: LoginScreen<'a>,
     help_screen: HelpScreen<'a>,
     command_line: CommandLine<'a>,
-    playback_bar: Gauge<'a>,
+    bottom_bar: BottomBar<'a>,
 
     // const
     terminal: Terminal<CrosstermBackend<Stdout>>,
@@ -41,11 +39,6 @@ pub struct App<'a> {
 impl<'a> App<'a> {
     pub fn new(terminal: Terminal<CrosstermBackend<Stdout>>) -> Self {
         let normal_style = Style::default();
-        let playback_bar = Gauge::default()
-            .block(Block::default().borders(Borders::ALL))
-            .gauge_style(tailwind::PINK.c300)
-            .ratio(0.0)
-            .label("--:--/--:--");
 
         Self {
             current_screen: ScreenEnum::Main,
@@ -56,7 +49,7 @@ impl<'a> App<'a> {
             login_screen: LoginScreen::new(&normal_style),
             help_screen: HelpScreen::new(&normal_style),
             command_line: CommandLine::new(&normal_style),
-            playback_bar,
+            bottom_bar: BottomBar::new(&normal_style),
             terminal,
             normal_style,
         }
@@ -98,23 +91,8 @@ impl<'a> App<'a> {
             ScreenEnum::Main => self.main_screen.update_model().await?,
         };
 
-        // playback_bar
-        let player_guard = PLAYER.lock().await;
-        if let Some(player_position) = player_guard.position() {
-            if let Some(player_duration) = player_guard.duration() {
-                self.playback_bar = self
-                    .playback_bar
-                    .clone()
-                    .ratio(player_position.mseconds() as f64 / player_duration.mseconds() as f64)
-                    .label(format!(
-                        "{:02}:{:02}/{:02}:{:02}",
-                        player_position.minutes(),
-                        player_position.seconds() % 60,
-                        player_duration.minutes(),
-                        player_duration.seconds() % 60,
-                    ));
-            }
-        }
+        // bottom_bar
+        self.bottom_bar.update_model().await?;
 
         Ok(())
     }
@@ -162,6 +140,9 @@ impl<'a> App<'a> {
                     // TODO: 清除 cache
                     NCM_API.lock().await.logout().await;
                 }
+                Command::PlayOrPause => {
+                    PLAYER.lock().await.play_or_pause();
+                }
                 // 需要向下传递的事件
                 Command::Down
                 | Command::Up
@@ -194,6 +175,9 @@ impl<'a> App<'a> {
                 ScreenEnum::Main => self.main_screen.update_view(&self.normal_style),
             }
         }
+
+        // bottom_bar
+        self.bottom_bar.update_view(&self.normal_style);
 
         // command_line
         let show_cursor = match self.current_mode {
@@ -230,12 +214,8 @@ impl<'a> App<'a> {
                 ScreenEnum::Main => self.main_screen.draw(frame, chunks[0]),
             }
 
-            // 渲染 bottom_panel，包含 control_bar_1 & playback_bar & control_bar_2
-            let bottom_panel_chunks = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([Constraint::Length(26), Constraint::Min(3), Constraint::Length(26)].as_ref())
-                .split(chunks[1]);
-            frame.render_widget(&self.playback_bar, bottom_panel_chunks[1]);
+            // 渲染 bottom_bar
+            self.bottom_bar.draw(frame, chunks[1]);
 
             // render command_line
             self.command_line.draw(frame, chunks[2]);
@@ -249,33 +229,35 @@ impl<'a> App<'a> {
 impl<'a> App<'a> {
     fn get_command_from_key(&mut self, key_code: KeyCode) {
         let cmd = match key_code {
-            KeyCode::Char('k') => Command::Up,
-            KeyCode::Up => Command::Up,
-            KeyCode::Char('j') => Command::Down,
             KeyCode::Down => Command::Down,
-            KeyCode::Char(' ') => Command::TogglePlay,
+            KeyCode::Up => Command::Up,
+            KeyCode::Char(' ') => Command::PlayOrPause,
+            KeyCode::Enter => Command::Play,
+            KeyCode::Esc => Command::Esc,
+            KeyCode::Right => Command::NextPanel,
+            KeyCode::Left => Command::PrevPanel,
+            KeyCode::Char('1') => Command::GotoScreen(ScreenEnum::Main),
+            KeyCode::Char('0') => Command::GotoScreen(ScreenEnum::Help),
+            KeyCode::F(1) => Command::GotoScreen(ScreenEnum::Help),
+            KeyCode::Char('q') => Command::Quit,
+            KeyCode::Char(':') => Command::EnterCommand,
+            //
+            KeyCode::Char('k') => Command::Up,
+            KeyCode::Char('j') => Command::Down,
             KeyCode::Char(',') => Command::PrevTrack,
             KeyCode::Char('.') => Command::NextTrack,
             // KeyCode::Enter => Command::QueueAndPlay,
-            KeyCode::Enter => Command::Play,
-            KeyCode::Esc => Command::Esc,
             KeyCode::Char('r') => Command::ToggleRepeat,
             KeyCode::Char('s') => Command::ToggleShuffle,
             KeyCode::Char('g') => Command::GotoTop,
             KeyCode::Char('G') => Command::GotoBottom,
-            KeyCode::Right => Command::NextPanel,
             KeyCode::Tab => Command::NextPanel,
-            KeyCode::Left => Command::PrevPanel,
             KeyCode::BackTab => Command::PrevPanel,
-            KeyCode::Char('1') => Command::GotoScreen(ScreenEnum::Main),
+
             // KeyCode::Char('2') => Command::GotoScreen(ScreenEnum::Playlists),
-            KeyCode::Char('0') => Command::GotoScreen(ScreenEnum::Help),
-            KeyCode::F(1) => Command::GotoScreen(ScreenEnum::Help),
             KeyCode::Char('n') => Command::NewPlaylist(None),
             KeyCode::Char('p') => Command::PlaylistAdd,
             KeyCode::Char('x') => Command::SelectPlaylist,
-            KeyCode::Char('q') => Command::Quit,
-            KeyCode::Char(':') => Command::EnterCommand,
             _ => Command::Nop,
         };
 

@@ -10,6 +10,7 @@ pub enum Command {
     NextPanel,
     PrevPanel,
     Play,
+    PlayOrPause,
     Pause,
     Stop,
     TogglePlay,

@@ -3,5 +3,6 @@ resolver = "2"
 
 members = [
     "ncm-api",
+    "ncm-play",
     "ncm-tui",
 ]
