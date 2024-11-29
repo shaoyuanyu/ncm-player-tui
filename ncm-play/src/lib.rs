@@ -2,6 +2,7 @@ use anyhow::Result;
 use gstreamer_play::{gst, Play, PlayVideoRenderer};
 use ncm_api::{NcmApi, SongInfo};
 use std::fmt;
+use rand::{thread_rng, Rng};
 use tokio::sync::MutexGuard;
 
 #[derive(Clone, PartialEq)]
@@ -70,7 +71,7 @@ impl Player {
         Self {
             play,
             play_state: PlayState::Stopped,
-            play_mode: PlayMode::ListRepeat,
+            play_mode: PlayMode::Shuffle,
             current_playlist_name: String::new(),
             current_playlist: Vec::new(),
             current_song_index: None,
@@ -220,7 +221,15 @@ impl Player {
                     None
                 }
             }
-            PlayMode::Shuffle => None,
+            PlayMode::Shuffle => {
+                if let Some(mut index) = self.current_song_index {
+                    index = thread_rng().gen_range(0..=self.current_playlist.len());
+                    self.current_song_index = Some(index);
+                    Some(self.current_playlist[index].clone())
+                } else {
+                    None
+                }
+            },
         };
     }
 
@@ -228,7 +237,6 @@ impl Player {
         self.play.stop();
         self.play.set_uri(Some(uri));
         self.play.play();
-        self.play_state = PlayState::Playing;
     }
 
     /// 播放下一首
@@ -245,7 +253,7 @@ impl Player {
             self.play_new_song_by_uri(song_info.song_url.as_str());
 
             // // 播放状态
-            // self.play_state = PlayState::Playing;
+            self.play_state = PlayState::Playing;
         } else {
             // 播放状态
             self.play_state = PlayState::Stopped;

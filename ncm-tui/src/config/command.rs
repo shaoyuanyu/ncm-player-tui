@@ -67,7 +67,7 @@ impl Command {
             },
             Some("l" | "login") => Ok(Self::GotoScreen(ScreenEnum::Login)),
             Some("logout") => Ok(Self::Logout),
-            Some("volume") => match tokens.next() {
+            Some("vol" | "volume") => match tokens.next() {
                 Some(num) => {
                     if let Ok(vol) = num.parse::<f64>() {
                         Ok(Self::SetVolume(vol / 100.0))

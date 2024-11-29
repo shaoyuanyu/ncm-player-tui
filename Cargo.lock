@@ -1585,6 +1585,7 @@ dependencies = [
  "gstreamer",
  "gstreamer-play",
  "ncm-api",
+ "rand",
  "tokio",
 ]
 
