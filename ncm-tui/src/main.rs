@@ -53,6 +53,9 @@ async fn main() -> Result<()> {
     });
 
     loop {
+        // 检查播放情况
+        PLAYER.lock().await.check_play_state();
+
         // 根据 Controller 流程，先执行 update_model()，再执行 handle_event()
         app.lock().await.update_model().await?;
 

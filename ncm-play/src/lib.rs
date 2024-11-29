@@ -34,6 +34,10 @@ impl Player {
         self.play.set_volume(0.0);
     }
 
+    pub fn volume(&self) -> f64 {
+        self.play.volume()
+    }
+
     pub fn pause(&mut self) {
         if self.play_state == PlayState::Playing {
             self.play.pause();
@@ -55,6 +59,14 @@ impl Player {
         } else if self.play_state == PlayState::Paused {
             self.play.play();
             self.play_state = PlayState::Playing;
+        }
+    }
+
+    pub fn check_play_state(&mut self) {
+        if self.play_state == PlayState::Playing {
+            if self.duration() == self.position() {
+                self.play_state = PlayState::Stopped;
+            }
         }
     }
 
