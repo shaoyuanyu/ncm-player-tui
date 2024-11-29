@@ -1581,8 +1581,11 @@ dependencies = [
 name = "ncm-play"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "gstreamer",
  "gstreamer-play",
+ "ncm-api",
+ "tokio",
 ]
 
 [[package]]
@@ -1595,7 +1598,6 @@ dependencies = [
  "fast_qr",
  "gstreamer",
  "gstreamer-play",
- "itertools",
  "lazy_static",
  "log",
  "mpris-server",

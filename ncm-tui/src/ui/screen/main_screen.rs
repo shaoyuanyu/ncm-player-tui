@@ -3,7 +3,6 @@ use crate::ui::widget::UIList;
 use crate::ui::Controller;
 use crate::{NCM_API, PLAYER};
 use anyhow::Result;
-use itertools::Itertools;
 use ncm_api::SongInfo;
 use ratatui::layout::Rect;
 use ratatui::prelude::*;
@@ -27,13 +26,11 @@ pub struct MainScreen<'a> {
     current_focus_panel: FocusPanel,
     //
     user_name: String,
+    //
     playlist_name: String,
-    playlist: Vec<SongInfo>, // TODO: Playlist
     playlist_items: Vec<ListItem<'a>>,
     //
     current_song_info: Option<SongInfo>,
-    current_song_lyric_timestamps: Option<Vec<u64>>, // 单位: ms
-    current_song_lyric_timestamp_index: Option<usize>,
     current_song_lyric_items: Vec<ListItem<'a>>,
 
     // view
@@ -47,11 +44,8 @@ impl<'a> MainScreen<'a> {
             current_focus_panel: FocusPanel::PlaylistOutside,
             user_name: String::new(),
             playlist_name: String::new(),
-            playlist: Vec::new(),
             playlist_items: Vec::new(),
             current_song_info: None,
-            current_song_lyric_timestamps: None,
-            current_song_lyric_timestamp_index: None,
             current_song_lyric_items: Vec::new(),
             playlist_ui: UIList::default(),
             song_ui: UIList::default(),
@@ -59,101 +53,11 @@ impl<'a> MainScreen<'a> {
     }
 }
 
-impl<'a> MainScreen<'a> {
-    pub fn update_playlist_model(&mut self, play_list_name: String, playlist: Vec<SongInfo>) {
-        self.playlist_name = play_list_name.to_string();
-        self.playlist = playlist;
-        self.playlist_items = self
-            .playlist
-            .iter()
-            .map(|song| ListItem::new(song.name.clone()))
-            .collect();
-
-        // 更新 playlist_ui selected，防止悬空
-        self.playlist_ui.state.select(None);
-    }
-
-    async fn play_song(&mut self, mut song_info: SongInfo) -> Result<()> {
-        let ncm_api_guard = NCM_API.lock().await;
-
-        // 更新 song url
-        song_info.song_url = ncm_api_guard.get_song_url(song_info.id).await?.url;
-        self.current_song_info = Some(song_info.clone());
-
-        // 更新歌词
-        if let Ok(current_song_lyric) = ncm_api_guard.song_lyric(song_info.clone()).await {
-            let mut current_song_lyric_timestamps = Vec::new();
-            let mut current_song_lyric_lines = Vec::new();
-            for (lyric_timestamp, lyric_line) in current_song_lyric {
-                current_song_lyric_timestamps.push(lyric_timestamp);
-                current_song_lyric_lines.push(lyric_line);
-            }
-            //
-            let mut current_song_lyric_timestamps_formated = Vec::new();
-            self.current_song_lyric_items = Vec::new();
-            //
-            let mut tuple_window_iter = current_song_lyric_timestamps
-                .iter()
-                .zip(current_song_lyric_lines.iter())
-                .tuple_windows()
-                .enumerate();
-            while let Some((index, (curr, next))) = tuple_window_iter.next() {
-                if curr.0 == next.0 {
-                    // 下句是本句的翻译
-                    current_song_lyric_timestamps_formated.push(curr.0.clone());
-                    self.current_song_lyric_items
-                        .push(ListItem::new(Text::from(vec![
-                            Line::from(format!("{}", curr.1)).centered(),
-                            Line::from(format!("{}", next.1)).centered(),
-                        ])));
-
-                    if index == current_song_lyric_lines.len() - 1 - 1 {
-                        // 下句为倒数第二句，也就是说最后一句自成一行无翻译
-                        if let Some((_, (_, last))) = tuple_window_iter.next() {
-                            current_song_lyric_timestamps_formated.push(last.0.clone());
-                            self.current_song_lyric_items.push(ListItem::new(Text::from(
-                                Line::from(format!("{}", last.1)).centered(),
-                            )));
-                        }
-                    } else {
-                        // 跳过下句
-                        tuple_window_iter.next();
-                    }
-                } else {
-                    // 无翻译
-                    current_song_lyric_timestamps_formated.push(curr.0.clone());
-                    self.current_song_lyric_items.push(ListItem::new(Text::from(
-                        Line::from(format!("{}", curr.1)).centered(),
-                    )));
-                }
-            }
-            //
-            self.current_song_lyric_timestamp_index = Some(0);
-            self.current_song_lyric_timestamps = Some(current_song_lyric_timestamps_formated);
-        } else {
-            // 获取歌词失败（纯音乐或网络波动）
-            self.current_song_lyric_timestamp_index = Some(0);
-            self.current_song_lyric_timestamps = Some(vec![0]);
-            self.current_song_lyric_items = Vec::new();
-            self.current_song_lyric_items.push(ListItem::new(Text::from(
-                Line::from("无歌词，请欣赏").centered(),
-            )));
-        }
-
-        // 更新 song_ui selected，防止悬空
-        self.song_ui.state.select(None);
-
-        // player
-        let mut player_guard = PLAYER.lock().await;
-        player_guard.play_new_song_by_uri(song_info.song_url.as_str());
-
-        Ok(())
-    }
-}
-
 impl<'a> Controller for MainScreen<'a> {
     async fn update_model(&mut self) -> Result<bool> {
         let mut result = Ok(false);
+
+        let player_guard = PLAYER.lock().await;
 
         // username
         if self.user_name.is_empty() {
@@ -164,31 +68,62 @@ impl<'a> Controller for MainScreen<'a> {
             result = Ok(true);
         }
 
-        // lyric 歌词推进
-        if let Some(current_player_position) = PLAYER.lock().await.position() {
-            if let Some(current_lyric_index) = self.current_song_lyric_timestamp_index {
-                // 注意歌词 index 越界问题
-                if current_lyric_index
-                    < self.current_song_lyric_timestamps.as_ref().unwrap().len() - 1
-                {
-                    let next_lyric_timestamp = self.current_song_lyric_timestamps.as_ref().unwrap()
-                        [current_lyric_index + 1]
-                        .clone();
+        // playlist
+        if self.playlist_name != *player_guard.current_playlist_name_ref() {
+            self.playlist_name = player_guard.current_playlist_name_ref().clone();
+            self.playlist_items = player_guard
+                .current_playlist()
+                .iter()
+                .map(|song| ListItem::new(song.name.clone()))
+                .collect();
 
-                    // 切换到下一句歌词
-                    if current_player_position.mseconds() >= next_lyric_timestamp {
-                        self.current_song_lyric_timestamp_index = self
-                            .current_song_lyric_timestamp_index
-                            .map(|index| index + 1);
+            // 更新 playlist_ui selected，防止悬空
+            self.playlist_ui.state.select(None);
+        }
 
-                        self.song_ui
-                            .state
-                            .select(Some(self.current_song_lyric_timestamp_index.unwrap()));
+        // lyric
+        if self.current_song_info == *player_guard.current_song_info_ref() {
+            // 歌曲仍在播放，当前歌词行需更新；或者无歌曲正在播放
+            if self.song_ui.state.selected() != player_guard.current_song_lyric_index() {
+                self.song_ui
+                    .state
+                    .select(player_guard.current_song_lyric_index());
 
-                        result = Ok(true);
-                    }
-                }
+                result = Ok(true);
             }
+        } else {
+            // 切换到新歌
+            self.current_song_info = player_guard.current_song_info_ref().clone();
+            // 更新歌词 ListItem
+            if let Some(lyrics) = player_guard.current_song_lyrics() {
+                // 有歌词
+                self.current_song_lyric_items = lyrics
+                    .iter()
+                    .map(|lyric| {
+                        if lyric.1 != None {
+                            // 有翻译
+                            ListItem::new(Text::from(vec![
+                                Line::from(lyric.0.clone()).centered(),
+                                Line::from(lyric.1.clone().unwrap()).centered(),
+                            ]))
+                        } else {
+                            // 无翻译
+                            ListItem::new(Text::from(Line::from(lyric.0.clone()).centered()))
+                        }
+                    })
+                    .collect();
+            } else {
+                // 无歌词（纯音乐或网络异常）
+                self.current_song_lyric_items = Vec::new();
+                self.current_song_lyric_items.push(ListItem::new(Text::from(
+                    Line::from("无歌词，请欣赏").centered(),
+                )));
+            }
+
+            // 更新 song_ui selected，防止悬空
+            self.song_ui.state.select(None);
+
+            result = Ok(true);
         }
 
         result
@@ -253,13 +188,14 @@ impl<'a> Controller for MainScreen<'a> {
             },
             Command::Play => match self.current_focus_panel {
                 FocusPanel::PlaylistInside => {
-                    self.play_song(
-                        self.playlist
-                            .get(self.playlist_ui.state.selected().unwrap_or(0))
-                            .unwrap()
-                            .clone(),
-                    )
-                    .await?;
+                    PLAYER
+                        .lock()
+                        .await
+                        .play_particularly_now(
+                            self.playlist_ui.state.selected().unwrap_or(0),
+                            NCM_API.lock().await,
+                        )
+                        .await?;
                 }
                 FocusPanel::LyricInside => {}
                 FocusPanel::PlaylistOutside => {

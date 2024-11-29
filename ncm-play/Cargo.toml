@@ -4,5 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+anyhow = "1.0.93"
+
 gstreamer = "0.23.3"
 gstreamer-play = "0.23.2"
+
+ncm-api = { path = "../ncm-api" }
+
+tokio = "1.41.1"

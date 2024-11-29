@@ -317,7 +317,7 @@ impl NcmApi {
     }
 
     /// 获取歌词
-    pub async fn song_lyric(&self, si: SongInfo) -> Result<Vec<(u64, String)>> {
+    pub async fn song_lyric(&self, si: SongInfo) -> Result<Vec<(u64, (String, Option<String>))>> {
         // 歌词文件位置
         let mut lyric_path = self.lyrics_path.clone();
         lyric_path.push(format!(
@@ -337,23 +337,23 @@ impl NcmApi {
 
         if !lyric_path.exists() {
             // 创建歌词文件，访问网易云接口获取
-            if let Ok(lyr) = self.get_song_lyric(si.id).await {
-                debug!("歌词: {:?}", lyr);
+            if let Ok(lyric_origin) = self.get_song_lyric(si.id).await {
+                debug!("歌词: {:?}", lyric_origin);
 
                 // 编码
-                let lyrics_with_timestamp = self.encode_lyric(&timestamp_re, &lyr);
+                let lyrics_with_timestamp = self.encode_lyric(&timestamp_re, &lyric_origin);
 
                 // 保存歌词文件
-                let lyric = lyr
+                let lyric = lyric_origin
                     .lyric
                     .into_iter()
                     .map(|x| re_abnormal_ts.replace_all(&x, "[$1:$2.$3]").to_string())
                     .collect::<Vec<String>>()
                     .join("\n");
                 fs::write(&lyric_path, lyric)?;
-                if !lyr.tlyric.is_empty() {
+                if !lyric_origin.tlyric.is_empty() {
                     // 保存翻译歌词文件
-                    let tlyric = lyr
+                    let tlyric = lyric_origin
                         .tlyric
                         .into_iter()
                         .map(|x| re_abnormal_ts.replace_all(&x, "[$1:$2.$3]").to_string())
@@ -397,32 +397,63 @@ impl NcmApi {
     }
 
     /// 编码歌词和翻译
-    fn encode_lyric(&self, timestamp_re: &Regex, lyrics: &Lyrics) -> Vec<(u64, String)> {
-        let mut lyrics_with_timestamp: Vec<(u64, String)> = Vec::new();
+    fn encode_lyric(
+        &self,
+        timestamp_re: &Regex,
+        lyrics: &Lyrics,
+    ) -> Vec<(u64, (String, Option<String>))> {
+        let mut lyrics_with_timestamp: Vec<(u64, (String, Option<String>))> = Vec::new();
 
-        for lyric in lyrics.lyric.iter() {
-            let mut time = 0;
+        // 以倒序遍历歌词文件和翻译文件，避免 [00:00.000] 同时有多行歌前信息（作词/作曲/编曲/...）和第一句歌词造成的翻译匹配错误
+        let lyric_rev_iter = lyrics.lyric.iter().rev();
+        // 翻译部分的功能较复杂，不用迭代器实现
+        let t_lyric = &lyrics.tlyric;
+        let mut t_lyric_rev_pointer: usize;
+        let have_t_lyric = !t_lyric.is_empty();
+        t_lyric_rev_pointer = if have_t_lyric {
+            lyrics.tlyric.len() - 1
+        } else {
+            0
+        };
+        //
+        for lyric in lyric_rev_iter {
             if lyric.len() >= 10 && timestamp_re.is_match(lyric) {
-                time = (lyric[1..3].parse::<u64>().unwrap() * 60
+                let time = (lyric[1..3].parse::<u64>().unwrap() * 60
                     + lyric[4..6].parse::<u64>().unwrap())
                     * 1000
                     + lyric[7..9].parse::<u64>().unwrap_or(0) * 10;
 
-                let mut nl = timestamp_re.replace_all(lyric, "").to_string();
-                nl = nl.trim_end_matches("\t").to_string(); // 部分句尾存在\t字符干扰渲染
-                nl.push('\n');
+                let mut lyric_line = timestamp_re.replace_all(lyric, "").to_string();
+                lyric_line = lyric_line.trim_end_matches("\t").to_string(); // 部分句尾存在\t字符干扰渲染
+                lyric_line.push('\n');
 
-                lyrics_with_timestamp.push((time, nl));
+                // 翻译位置先填 None
+                lyrics_with_timestamp.push((time, (lyric_line, None)));
             }
-            for t in lyrics.tlyric.iter() {
-                if t.len() >= 10 && lyric.len() >= 10 && t.starts_with(&lyric[0..10]) {
-                    let mut nt = timestamp_re.replace_all(t, "").to_string();
-                    nt = nt.trim_end_matches("\t").to_string(); // 部分句尾存在\t字符干扰渲染
-                    nt.push('\n');
-                    lyrics_with_timestamp.push((time, nt));
+            if have_t_lyric {
+                if let Some(t_lyric) = t_lyric.get(t_lyric_rev_pointer) {
+                    if t_lyric.len() >= 10
+                        && lyric.len() >= 10
+                        && t_lyric.starts_with(&lyric[0..10])
+                    {
+                        let mut t_lyric_line = timestamp_re.replace_all(t_lyric, "").to_string();
+                        t_lyric_line = t_lyric_line.trim_end_matches("\t").to_string(); // 部分句尾存在\t字符干扰渲染
+                        t_lyric_line.push('\n');
+
+                        // 更新对应的翻译
+                        if let Some(last) = lyrics_with_timestamp.as_mut_slice().last_mut() {
+                            *last = (last.0.clone(), (last.1 .0.clone(), Some(t_lyric_line)));
+                        }
+
+                        // 只有当翻译匹配到时间戳相同的歌词时指针才移动
+                        t_lyric_rev_pointer -= 1;
+                    }
                 }
             }
         }
+
+        // 倒转恢复顺序
+        lyrics_with_timestamp.reverse();
 
         lyrics_with_timestamp
     }

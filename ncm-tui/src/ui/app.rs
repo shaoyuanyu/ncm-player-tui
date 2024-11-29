@@ -59,12 +59,11 @@ impl<'a> App<'a> {
     pub async fn init_after_login(&mut self) -> Result<()> {
         let ncm_api_guard = NCM_API.lock().await;
 
-        self.main_screen = MainScreen::new(&self.normal_style);
-        // self.playlist_screen = PlaylistScreen::new(&normal_style);
-
         if let (Some(playlist_name), Some(playlist)) = ncm_api_guard.user_favorite_songlist() {
-            self.main_screen
-                .update_playlist_model(playlist_name, playlist);
+            PLAYER
+                .lock()
+                .await
+                .switch_playlist(playlist_name.clone(), playlist.clone());
         }
 
         self.switch_screen(ScreenEnum::Main).await;
@@ -152,12 +151,12 @@ impl<'a> App<'a> {
                 | Command::Play => {
                     // 先 update_model(), 再 handle_event()
                     // 取或值
-                    self.need_re_update_view = self.need_re_update_view
-                        || match self.current_screen {
-                            ScreenEnum::Main => self.main_screen.handle_event(cmd).await?,
-                            ScreenEnum::Login => self.login_screen.handle_event(cmd).await?,
-                            ScreenEnum::Help => self.help_screen.handle_event(cmd).await?,
-                        };
+                    // 若写成 self.need_re_update_view = self.need_re_update_view || match ... {} ，match块内的方法可能不被执行
+                    self.need_re_update_view = match self.current_screen {
+                        ScreenEnum::Main => self.main_screen.handle_event(cmd).await?,
+                        ScreenEnum::Login => self.login_screen.handle_event(cmd).await?,
+                        ScreenEnum::Help => self.help_screen.handle_event(cmd).await?,
+                    } || self.need_re_update_view;
                 }
                 _ => {}
             }
