@@ -5,20 +5,13 @@ use anyhow::Result;
 use ratatui::layout::{Layout, Rect};
 use ratatui::prelude::{Constraint, Direction, Style};
 use ratatui::style::palette::tailwind;
-use ratatui::text::Text;
+use ratatui::text::{Line, Text};
 use ratatui::widgets::{Block, Borders, Gauge, Paragraph};
 use ratatui::Frame;
 
 //
 const CHAR_FLAG_PLAY: char = '\u{f040a}';
 const CHAR_FLAG_PAUSE: char = '\u{f03e4}';
-//
-const CHAR_FLAG_SHUFFLE: char = '\u{f049d}';
-const CHAR_FLAG_SHUFFLE_OFF: char = '\u{f049e}';
-//
-const CHAR_FLAG_REPEAT: char = '\u{f0456}';
-const CHAR_FLAG_REPEAT_OFF: char = '\u{f0457}';
-const CHAR_FLAG_REPEAT_ONCE: char = '\u{f0458}';
 
 pub struct BottomBar<'a> {
     // model
@@ -54,17 +47,18 @@ impl<'a> Controller for BottomBar<'a> {
         let player_guard = PLAYER.lock().await;
 
         // info_bar
-        self.info_bar_text = Text::from(format!(
-            "  {}  {}  {}  |  {}  ",
-            '\u{f0456}',
-            if player_guard.is_playing() {
-                CHAR_FLAG_PAUSE
-            } else {
-                CHAR_FLAG_PLAY
-            },
-            '\u{f049d}',
-            player_guard.play_state()
-        ));
+        self.info_bar_text = Text::from(
+            Line::from(format!(
+                "{}  |  {}  ",
+                player_guard.play_mode(),
+                if player_guard.is_playing() {
+                    CHAR_FLAG_PAUSE
+                } else {
+                    CHAR_FLAG_PLAY
+                },
+            ))
+            .centered(),
+        );
 
         // playback_bar
         if let (Some(player_position), Some(player_duration)) =
@@ -122,9 +116,9 @@ impl<'a> Controller for BottomBar<'a> {
             .direction(Direction::Horizontal)
             .constraints(
                 [
-                    Constraint::Length(26),
-                    Constraint::Min(3),
-                    Constraint::Length(26),
+                    Constraint::Length(20),
+                    Constraint::Min(10),
+                    Constraint::Length(20),
                 ]
                 .as_ref(),
             )

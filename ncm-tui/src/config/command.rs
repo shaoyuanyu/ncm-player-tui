@@ -74,9 +74,9 @@ impl Command {
                     } else {
                         Err(anyhow!("volume: Invalid argument NUMBER"))
                     }
-                },
+                }
                 _ => Err(anyhow!("volume: Missing argument NUMBER")),
-            }
+            },
             Some(other) => Err(anyhow!("Invalid command: {}", other)),
             None => Ok(Self::Nop),
         }

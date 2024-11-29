@@ -1,6 +1,7 @@
 use anyhow::Result;
 use gstreamer_play::{gst, Play, PlayVideoRenderer};
 use ncm_api::{NcmApi, SongInfo};
+use std::fmt;
 use tokio::sync::MutexGuard;
 
 #[derive(Clone, PartialEq)]
@@ -23,6 +24,17 @@ pub enum PlayMode {
     SingleRepeat,
     ListRepeat,
     Shuffle,
+}
+
+impl fmt::Display for PlayMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PlayMode::Single => write!(f, "单曲播放"),
+            PlayMode::SingleRepeat => write!(f, "单曲循环"),
+            PlayMode::ListRepeat => write!(f, "列表循环"),
+            PlayMode::Shuffle => write!(f, "随机播放"),
+        }
+    }
 }
 
 pub struct Player {
@@ -88,13 +100,8 @@ impl Player {
         self.play_state == PlayState::Playing
     }
 
-    pub fn play_state(&self) -> String {
-        match self.play_state {
-            PlayState::Stopped => String::from("pick a song to play :)"),
-            PlayState::Paused => String::from("Paused"),
-            PlayState::Playing => String::from("Playing"),
-            PlayState::Ended => String::from("Single track ended"),
-        }
+    pub fn play_mode(&self) -> String {
+        self.play_mode.to_string()
     }
 
     pub fn duration(&self) -> Option<gst::ClockTime> {
