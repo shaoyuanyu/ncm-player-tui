@@ -132,14 +132,6 @@ impl Player {
 
 /// public
 impl Player {
-    pub fn check_play_state(&mut self) {
-        // if self.play_state == PlayState::Playing {
-        //     if self.duration() == self.position() {
-        //         self.play_state = PlayState::Stopped;
-        //     }
-        // }
-    }
-
     pub fn play_or_pause(&mut self) {
         if self.play_state == PlayState::Playing {
             self.play.pause();
@@ -179,8 +171,13 @@ impl Player {
     pub async fn auto_play<'a>(&mut self, ncm_api_guard: MutexGuard<'a, NcmApi>) -> Result<()> {
         // 判断一首歌是否播放完
         if self.play_state == PlayState::Playing {
-            if self.duration() == self.position() {
-                self.play_state = PlayState::Ended;
+            if let (Some(position), Some(duration)) = (self.position(), self.duration()) {
+                let position_msec = position.mseconds();
+                let duration_msec = duration.mseconds();
+
+                if position_msec >= duration_msec {
+                    self.play_state = PlayState::Ended;
+                }
             }
         }
 
@@ -199,6 +196,7 @@ impl Player {
 
 /// private
 impl Player {
+    /// 根据模式更新下一首播放的歌曲
     fn update_next_to_play(&mut self) {
         self.current_song_info = match self.play_mode {
             PlayMode::Single => None,
@@ -226,6 +224,7 @@ impl Player {
         self.play_state = PlayState::Playing;
     }
 
+    /// 播放下一首
     async fn play_next<'a>(&mut self, ncm_api_guard: MutexGuard<'a, NcmApi>) -> Result<()> {
         if let Some(mut song_info) = self.current_song_info.clone() {
             // 获取歌曲 uri
@@ -238,8 +237,8 @@ impl Player {
             // 播放
             self.play_new_song_by_uri(song_info.song_url.as_str());
 
-            // 播放状态
-            self.play_state = PlayState::Playing;
+            // // 播放状态
+            // self.play_state = PlayState::Playing;
         } else {
             // 播放状态
             self.play_state = PlayState::Stopped;

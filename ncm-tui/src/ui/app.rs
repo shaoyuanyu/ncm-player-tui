@@ -142,6 +142,9 @@ impl<'a> App<'a> {
                 Command::PlayOrPause => {
                     PLAYER.lock().await.play_or_pause();
                 }
+                Command::SetVolume(vol) => {
+                    PLAYER.lock().await.set_volume(vol)
+                }
                 // 需要向下传递的事件
                 Command::Down
                 | Command::Up

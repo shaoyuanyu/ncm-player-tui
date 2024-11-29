@@ -4,14 +4,19 @@ use std::path::PathBuf;
 
 pub enum Command {
     Quit,
+    GotoScreen(ScreenEnum),
+    EnterCommand,
+    Logout,
+    PlayOrPause,
+    SetVolume(f64),
+    //
     Down,
     Up,
-    Esc,
     NextPanel,
     PrevPanel,
+    Esc,
     Play,
-    PlayOrPause,
-    Pause,
+    //
     Stop,
     TogglePlay,
     ToggleShuffle,
@@ -19,16 +24,16 @@ pub enum Command {
     QueueAndPlay,
     GotoTop,
     GotoBottom,
-    GotoScreen(ScreenEnum),
+
     NewPlaylist(Option<String>),
     PlaylistAdd,
     SelectPlaylist,
     PrevTrack,
     NextTrack,
-    EnterCommand,
+
     AddPath(PathBuf),
     PlayTrack(PathBuf),
-    Logout,
+
     Nop,
 }
 
@@ -62,6 +67,16 @@ impl Command {
             },
             Some("l" | "login") => Ok(Self::GotoScreen(ScreenEnum::Login)),
             Some("logout") => Ok(Self::Logout),
+            Some("volume") => match tokens.next() {
+                Some(num) => {
+                    if let Ok(vol) = num.parse::<f64>() {
+                        Ok(Self::SetVolume(vol / 100.0))
+                    } else {
+                        Err(anyhow!("volume: Invalid argument NUMBER"))
+                    }
+                },
+                _ => Err(anyhow!("volume: Missing argument NUMBER")),
+            }
             Some(other) => Err(anyhow!("Invalid command: {}", other)),
             None => Ok(Self::Nop),
         }
