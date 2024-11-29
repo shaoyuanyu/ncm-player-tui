@@ -92,11 +92,12 @@ impl<'a> MainScreen<'a> {
             let mut current_song_lyric_timestamps_formated = Vec::new();
             self.current_song_lyric_items = Vec::new();
             //
-            for (prev, curr, next) in current_song_lyric_timestamps
+            let mut tuple_window_iter = current_song_lyric_timestamps
                 .iter()
                 .zip(current_song_lyric_lines.iter())
                 .tuple_windows()
-            {
+                .enumerate();
+            while let Some((index, (curr, next))) = tuple_window_iter.next() {
                 if curr.0 == next.0 {
                     // 下句是本句的翻译
                     current_song_lyric_timestamps_formated.push(curr.0.clone());
@@ -105,9 +106,19 @@ impl<'a> MainScreen<'a> {
                             Line::from(format!("{}", curr.1)).centered(),
                             Line::from(format!("{}", next.1)).centered(),
                         ])));
-                } else if prev.0 == curr.0 {
-                    // 本句是上句的翻译
-                    // do nothing
+
+                    if index == current_song_lyric_lines.len() - 1 - 1 {
+                        // 下句为倒数第二句，也就是说最后一句自成一行无翻译
+                        if let Some((_, (_, last))) = tuple_window_iter.next() {
+                            current_song_lyric_timestamps_formated.push(last.0.clone());
+                            self.current_song_lyric_items.push(ListItem::new(Text::from(
+                                Line::from(format!("{}", last.1)).centered(),
+                            )));
+                        }
+                    } else {
+                        // 跳过下句
+                        tuple_window_iter.next();
+                    }
                 } else {
                     // 无翻译
                     current_song_lyric_timestamps_formated.push(curr.0.clone());

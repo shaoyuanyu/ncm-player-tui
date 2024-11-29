@@ -331,35 +331,17 @@ impl NcmApi {
         translation_lyric_path.push(format!("{}.tlrc", si.id));
 
         // 替换歌词时间
-        let re = regex::Regex::new(r"\[\d+:\d+.\d+\]")?;
+        let timestamp_re = Regex::new(r"\[\d+:\d+.\d+]")?;
         // 修正不正常的时间戳 [00:11:22]
-        let re_abnormal_ts = regex::Regex::new(r"^\[(\d+):(\d+):(\d+)\]")?;
+        let re_abnormal_ts = Regex::new(r"^\[(\d+):(\d+):(\d+)]")?;
 
         if !lyric_path.exists() {
+            // 创建歌词文件，访问网易云接口获取
             if let Ok(lyr) = self.get_song_lyric(si.id).await {
                 debug!("歌词: {:?}", lyr);
 
-                // 添加歌词翻译
-                let mut lt = Vec::new();
-                for l in lyr.lyric.iter() {
-                    let mut time = 0;
-                    if l.len() >= 10 && re.is_match(l) {
-                        time = (l[1..3].parse::<u64>().unwrap() * 60
-                            + l[4..6].parse::<u64>().unwrap())
-                            * 1000
-                            + l[7..9].parse::<u64>().unwrap_or(0) * 10;
-                        let mut nl = re.replace_all(l, "").to_string();
-                        nl.push('\n');
-                        lt.push((time, nl));
-                    }
-                    for t in lyr.tlyric.iter() {
-                        if t.len() >= 10 && l.len() >= 10 && t.starts_with(&l[0..10]) {
-                            let mut nt = re.replace_all(t, "").to_string();
-                            nt.push('\n');
-                            lt.push((time, nt));
-                        }
-                    }
-                }
+                // 编码
+                let lyrics_with_timestamp = self.encode_lyric(&timestamp_re, &lyr);
 
                 // 保存歌词文件
                 let lyric = lyr
@@ -381,22 +363,23 @@ impl NcmApi {
                 }
 
                 // 组织歌词+翻译
-                Ok(lt)
+                Ok(lyrics_with_timestamp)
             } else {
                 anyhow::bail!("No lyrics found!")
             }
         } else {
-            let lyric = fs::read_to_string(&lyric_path)?;
-            let lyrics: Vec<String> = lyric
+            // 歌词文件已存在缓存
+            let lyric_file = fs::read_to_string(&lyric_path)?;
+            let lyric: Vec<String> = lyric_file
                 .split('\n')
                 .collect::<Vec<&str>>()
                 .iter()
                 .map(|s| s.to_string())
                 .collect();
-            let mut tlyrics = vec![];
+            let mut tlyric = vec![];
             if translation_lyric_path.exists() {
-                let tlyric = fs::read_to_string(&translation_lyric_path)?;
-                tlyrics = tlyric
+                let tlyric_file = fs::read_to_string(&translation_lyric_path)?;
+                tlyric = tlyric_file
                     .split('\n')
                     .collect::<Vec<&str>>()
                     .iter()
@@ -404,30 +387,44 @@ impl NcmApi {
                     .collect();
             }
 
-            // 添加歌词翻译
-            let mut lt = Vec::new();
-            for l in lyrics.iter() {
-                let mut time = 0;
-                if l.len() >= 10 && re.is_match(l) {
-                    time = (l[1..3].parse::<u64>().unwrap() * 60 + l[4..6].parse::<u64>().unwrap())
-                        * 1000
-                        + l[7..9].parse::<u64>().unwrap_or(0) * 10;
-                    let mut nl = re.replace_all(l, "").to_string();
-                    nl.push('\n');
-                    lt.push((time, nl));
-                }
-                for t in tlyrics.iter() {
-                    if t.len() >= 10 && l.len() >= 10 && t.starts_with(&l[0..10]) {
-                        let mut nt = re.replace_all(t, "").to_string();
-                        nt.push('\n');
-                        lt.push((time, nt));
-                    }
-                }
-            }
+            // 编码歌词和翻译
+            let lyrics = Lyrics { lyric, tlyric };
+            let lyrics_with_stamp = self.encode_lyric(&timestamp_re, &lyrics);
 
             // 组织歌词+翻译
-            Ok(lt)
+            Ok(lyrics_with_stamp)
         }
+    }
+
+    /// 编码歌词和翻译
+    fn encode_lyric(&self, timestamp_re: &Regex, lyrics: &Lyrics) -> Vec<(u64, String)> {
+        let mut lyrics_with_timestamp: Vec<(u64, String)> = Vec::new();
+
+        for lyric in lyrics.lyric.iter() {
+            let mut time = 0;
+            if lyric.len() >= 10 && timestamp_re.is_match(lyric) {
+                time = (lyric[1..3].parse::<u64>().unwrap() * 60
+                    + lyric[4..6].parse::<u64>().unwrap())
+                    * 1000
+                    + lyric[7..9].parse::<u64>().unwrap_or(0) * 10;
+
+                let mut nl = timestamp_re.replace_all(lyric, "").to_string();
+                nl = nl.trim_end_matches("\t").to_string(); // 部分句尾存在\t字符干扰渲染
+                nl.push('\n');
+
+                lyrics_with_timestamp.push((time, nl));
+            }
+            for t in lyrics.tlyric.iter() {
+                if t.len() >= 10 && lyric.len() >= 10 && t.starts_with(&lyric[0..10]) {
+                    let mut nt = timestamp_re.replace_all(t, "").to_string();
+                    nt = nt.trim_end_matches("\t").to_string(); // 部分句尾存在\t字符干扰渲染
+                    nt.push('\n');
+                    lyrics_with_timestamp.push((time, nt));
+                }
+            }
+        }
+
+        lyrics_with_timestamp
     }
 
     /// 查询歌词
@@ -666,7 +663,7 @@ impl NcmApi {
         let mut csrf = self.csrf.lock().await.borrow().to_owned();
         if csrf.is_empty() {
             if let Some(cookies) = self.cookie_jar() {
-                let uri = BASE_URL.parse().unwrap();
+                let uri = BASE_URL.parse()?;
                 if let Some(cookie) = cookies.get_by_name(&uri, "__csrf") {
                     let __csrf = cookie.value().to_string();
                     self.csrf.lock().await.replace(__csrf.to_owned());
@@ -719,8 +716,7 @@ impl NcmApi {
                     .header("Host", "music.163.com")
                     .header("Referer", "https://music.163.com")
                     .header("User-Agent", user_agent)
-                    .body(body)
-                    .unwrap();
+                    .body(body)?;
                 let mut response = self
                     .client
                     .send_async(request)
