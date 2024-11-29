@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use gstreamer_play::{gst, Play, PlayVideoRenderer};
 use ncm_api::{NcmApi, SongInfo};
 use std::fmt;
@@ -105,16 +105,16 @@ impl Player {
         self.play_mode.to_string()
     }
 
+    pub fn set_play_mode(&mut self, mode: PlayMode) {
+        self.play_mode = mode;
+    }
+
     pub fn duration(&self) -> Option<gst::ClockTime> {
         self.play.duration()
     }
 
     pub fn position(&self) -> Option<gst::ClockTime> {
         self.play.position()
-    }
-
-    pub fn set_play_mode(&mut self, play_mode: PlayMode) {
-        self.play_mode = play_mode;
     }
 
     pub fn current_playlist_name_ref(&self) -> &String {
@@ -140,6 +140,7 @@ impl Player {
 
 /// public
 impl Player {
+    /// 切换播放/暂停
     pub fn play_or_pause(&mut self) {
         if self.play_state == PlayState::Playing {
             self.play.pause();
@@ -150,6 +151,7 @@ impl Player {
         }
     }
 
+    /// 切换播放列表
     pub fn switch_playlist(&mut self, playlist_name: String, playlist: Vec<SongInfo>) {
         self.current_playlist_name = playlist_name;
         self.current_playlist = playlist;
@@ -160,22 +162,7 @@ impl Player {
         };
     }
 
-    pub async fn play_particularly_now<'a>(
-        &mut self,
-        index_to_play: usize,
-        ncm_api_guard: MutexGuard<'a, NcmApi>,
-    ) -> Result<()> {
-        if index_to_play < self.current_playlist.len() {
-            self.play_state = PlayState::Playing;
-            self.current_song_index = Some(index_to_play);
-            self.current_song_info = Some(self.current_playlist[index_to_play].clone());
-
-            self.play_next(ncm_api_guard).await?;
-        }
-
-        Ok(())
-    }
-
+    /// 自动播放
     pub async fn auto_play<'a>(&mut self, ncm_api_guard: MutexGuard<'a, NcmApi>) -> Result<()> {
         // 判断一首歌是否播放完
         if self.play_state == PlayState::Playing {
@@ -199,6 +186,43 @@ impl Player {
         }
 
         Ok(())
+    }
+
+    /// 立刻播放指定歌曲
+    pub async fn play_particularly_now<'a>(
+        &mut self,
+        index_to_play: usize,
+        ncm_api_guard: MutexGuard<'a, NcmApi>,
+    ) -> Result<()> {
+        if index_to_play < self.current_playlist.len() {
+            self.play_state = PlayState::Playing;
+            self.current_song_index = Some(index_to_play);
+            self.current_song_info = Some(self.current_playlist[index_to_play].clone());
+
+            self.play_next(ncm_api_guard).await?;
+        }
+
+        Ok(())
+    }
+
+    /// 根据当前模式开始播放
+    pub async fn start_play<'a>(&mut self, ncm_api_guard: MutexGuard<'a, NcmApi>) -> Result<()> {
+        match self.play_mode {
+            PlayMode::ListRepeat => {
+                self.current_song_index = Some(0);
+                self.current_song_info = Some(self.current_playlist[0].clone());
+                self.play_next(ncm_api_guard).await?;
+                Ok(())
+            }
+            PlayMode::Shuffle => {
+                let index = thread_rng().gen_range(0..=self.current_playlist.len());
+                self.current_song_index = Some(index);
+                self.current_song_info = Some(self.current_playlist[index].clone());
+                self.play_next(ncm_api_guard).await?;
+                Ok(())
+            }
+            _ => { Err(anyhow!("start命令只在`列表循环`和`随机播放`模式下有效")) }
+        }
     }
 }
 

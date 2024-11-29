@@ -1,6 +1,7 @@
 use crate::config::ScreenEnum;
 use anyhow::{anyhow, Result};
-use std::path::PathBuf;
+use ncm_play::PlayMode;
+use crate::config::Command::SwitchPlayMode;
 
 pub enum Command {
     Quit,
@@ -9,6 +10,8 @@ pub enum Command {
     Logout,
     PlayOrPause,
     SetVolume(f64),
+    SwitchPlayMode(PlayMode),
+    StartPlay,
     //
     Down,
     Up,
@@ -17,23 +20,8 @@ pub enum Command {
     Esc,
     Play,
     //
-    Stop,
-    TogglePlay,
-    ToggleShuffle,
-    ToggleRepeat,
-    QueueAndPlay,
-    GotoTop,
-    GotoBottom,
-
-    NewPlaylist(Option<String>),
-    PlaylistAdd,
-    SelectPlaylist,
     PrevTrack,
     NextTrack,
-
-    AddPath(PathBuf),
-    PlayTrack(PathBuf),
-
     Nop,
 }
 
@@ -43,8 +31,6 @@ impl Command {
 
         match tokens.next() {
             Some("q" | "quit" | "exit") => Ok(Self::Quit),
-            Some("s" | "shuf" | "shuffle") => Ok(Self::ToggleShuffle),
-            Some("r" | "rep" | "repeat") => Ok(Self::ToggleRepeat),
             Some("screen") => match tokens.next() {
                 Some("1" | "main") => Ok(Self::GotoScreen(ScreenEnum::Main)),
                 // Some("2" | "playlist" | "playlists") => Ok(Self::GotoScreen(ScreenEnum::Playlists)),
@@ -53,18 +39,6 @@ impl Command {
                 None => Err(anyhow!("screen: Missing argument SCREEN_ID")),
             },
             Some("h" | "help") => Ok(Self::GotoScreen(ScreenEnum::Help)),
-            Some("a" | "add") => match cmd_str.split_once(' ') {
-                Some((_, p)) => Ok(Self::AddPath(p.into())),
-                None => Err(anyhow!("add: Missing argument PATH")),
-            },
-            Some("n" | "new-playlist") => match cmd_str.split_once(' ') {
-                Some((_, name)) => Ok(Self::NewPlaylist(Some(name.into()))),
-                None => Ok(Self::NewPlaylist(None)),
-            },
-            Some("p" | "play") => match cmd_str.split_once(' ') {
-                Some((_, path)) => Ok(Self::PlayTrack(path.into())),
-                None => Err(anyhow!("play: Missing argument PATH")),
-            },
             Some("l" | "login") => Ok(Self::GotoScreen(ScreenEnum::Login)),
             Some("logout") => Ok(Self::Logout),
             Some("vol" | "volume") => match tokens.next() {
@@ -75,8 +49,17 @@ impl Command {
                         Err(anyhow!("volume: Invalid argument NUMBER"))
                     }
                 }
-                _ => Err(anyhow!("volume: Missing argument NUMBER")),
+                None => Err(anyhow!("volume: Missing argument NUMBER")),
             },
+            Some("mode") => match tokens.next() {
+                Some("single") => Ok(Self::SwitchPlayMode(PlayMode::Single)),
+                Some("sr" | "single-repeat") => Ok(SwitchPlayMode(PlayMode::SingleRepeat)),
+                Some("lr" | "list-repeat") => Ok(SwitchPlayMode(PlayMode::ListRepeat)),
+                Some("s" | "shuf" | "shuffle") => Ok(SwitchPlayMode(PlayMode::Shuffle)),
+                Some(other) => Err(anyhow!("switch: Invalid play mode identifier: {}", other)),
+                None => Err(anyhow!("switch: Missing argument PLAY_MODE")),
+            }
+            Some("start") => Ok(Self::StartPlay),
             Some(other) => Err(anyhow!("Invalid command: {}", other)),
             None => Ok(Self::Nop),
         }

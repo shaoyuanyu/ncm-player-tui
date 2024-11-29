@@ -142,7 +142,17 @@ impl<'a> App<'a> {
                 Command::PlayOrPause => {
                     PLAYER.lock().await.play_or_pause();
                 }
-                Command::SetVolume(vol) => PLAYER.lock().await.set_volume(vol),
+                Command::SetVolume(vol) => {
+                    PLAYER.lock().await.set_volume(vol);
+                }
+                Command::SwitchPlayMode(play_mode) => {
+                    PLAYER.lock().await.set_play_mode(play_mode);
+                }
+                Command::StartPlay => {
+                    if let Err(e) = PLAYER.lock().await.start_play(NCM_API.lock().await).await {
+                        self.show_prompt(e.to_string().as_str());
+                    }
+                }
                 // 需要向下传递的事件
                 Command::Down
                 | Command::Up
@@ -246,18 +256,8 @@ impl<'a> App<'a> {
             KeyCode::Char('j') => Command::Down,
             KeyCode::Char(',') => Command::PrevTrack,
             KeyCode::Char('.') => Command::NextTrack,
-            // KeyCode::Enter => Command::QueueAndPlay,
-            KeyCode::Char('r') => Command::ToggleRepeat,
-            KeyCode::Char('s') => Command::ToggleShuffle,
-            KeyCode::Char('g') => Command::GotoTop,
-            KeyCode::Char('G') => Command::GotoBottom,
             KeyCode::Tab => Command::NextPanel,
             KeyCode::BackTab => Command::PrevPanel,
-
-            // KeyCode::Char('2') => Command::GotoScreen(ScreenEnum::Playlists),
-            KeyCode::Char('n') => Command::NewPlaylist(None),
-            KeyCode::Char('p') => Command::PlaylistAdd,
-            KeyCode::Char('x') => Command::SelectPlaylist,
             _ => Command::Nop,
         };
 
