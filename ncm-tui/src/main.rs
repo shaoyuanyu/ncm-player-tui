@@ -31,6 +31,8 @@ lazy_static! {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // env_logger::init();
+
     let app = Arc::new(Mutex::new(App::new(create_terminal()?)));
 
     // 创建 NCM_API 时会默认尝试 cookie 登录，在新线程中检查 cookie 状态并初始化

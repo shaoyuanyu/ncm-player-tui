@@ -1,7 +1,7 @@
+use crate::config::Command::SwitchPlayMode;
 use crate::config::ScreenEnum;
 use anyhow::{anyhow, Result};
 use ncm_play::PlayMode;
-use crate::config::Command::SwitchPlayMode;
 
 pub enum Command {
     Quit,
@@ -12,6 +12,7 @@ pub enum Command {
     SetVolume(f64),
     SwitchPlayMode(PlayMode),
     StartPlay,
+    NextSong,
     //
     Down,
     Up,
@@ -20,8 +21,7 @@ pub enum Command {
     Esc,
     Play,
     //
-    PrevTrack,
-    NextTrack,
+    PrevSong,
     Nop,
 }
 
@@ -52,13 +52,14 @@ impl Command {
                 None => Err(anyhow!("volume: Missing argument NUMBER")),
             },
             Some("mode") => match tokens.next() {
-                Some("single") => Ok(Self::SwitchPlayMode(PlayMode::Single)),
+                Some("single") => Ok(SwitchPlayMode(PlayMode::Single)),
                 Some("sr" | "single-repeat") => Ok(SwitchPlayMode(PlayMode::SingleRepeat)),
                 Some("lr" | "list-repeat") => Ok(SwitchPlayMode(PlayMode::ListRepeat)),
                 Some("s" | "shuf" | "shuffle") => Ok(SwitchPlayMode(PlayMode::Shuffle)),
                 Some(other) => Err(anyhow!("switch: Invalid play mode identifier: {}", other)),
                 None => Err(anyhow!("switch: Missing argument PLAY_MODE")),
-            }
+            },
+            Some("next") => Ok(Self::NextSong),
             Some("start") => Ok(Self::StartPlay),
             Some(other) => Err(anyhow!("Invalid command: {}", other)),
             None => Ok(Self::Nop),

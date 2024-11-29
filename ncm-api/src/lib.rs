@@ -14,7 +14,7 @@ use cookie_store::CookieStore;
 pub use isahc::cookies::{CookieBuilder, CookieJar};
 use isahc::{prelude::*, *};
 use lazy_static::lazy_static;
-use log::{debug, error};
+use log::{error, trace};
 use regex::Regex;
 use std::cell::RefCell;
 use std::sync::Arc;
@@ -294,9 +294,14 @@ impl NcmApi {
 impl NcmApi {
     /// 获取音乐（单曲） url
     /// 使用 Eapi 获取音乐
-    pub async fn get_song_url(&self, id: u64) -> Result<SongUrl> {
+    pub async fn get_song_url(&self, id: u64) -> Result<String> {
         let song_urls = self.get_song_urls(&[id]).await?;
-        Ok(song_urls[0].clone())
+
+        if !song_urls.is_empty() {
+            Ok(song_urls[0].url.clone())
+        } else {
+            Err(anyhow!("failed to get song url"))
+        }
     }
 
     /// 歌曲 URL
@@ -338,7 +343,7 @@ impl NcmApi {
         if !lyric_path.exists() {
             // 创建歌词文件，访问网易云接口获取
             if let Ok(lyric_origin) = self.get_song_lyric(si.id).await {
-                debug!("歌词: {:?}", lyric_origin);
+                trace!("歌词: {:?}", lyric_origin);
 
                 // 编码
                 let lyrics_with_timestamp = self.encode_lyric(&timestamp_re, &lyric_origin);
@@ -409,7 +414,7 @@ impl NcmApi {
         // 翻译部分的功能较复杂，不用迭代器实现
         let t_lyric = &lyrics.tlyric;
         let mut t_lyric_rev_pointer: usize;
-        let have_t_lyric = !t_lyric.is_empty();
+        let mut have_t_lyric = !t_lyric.is_empty();
         t_lyric_rev_pointer = if have_t_lyric {
             lyrics.tlyric.len() - 1
         } else {
@@ -446,7 +451,13 @@ impl NcmApi {
                         }
 
                         // 只有当翻译匹配到时间戳相同的歌词时指针才移动
-                        t_lyric_rev_pointer -= 1;
+                        if t_lyric_rev_pointer > 0 {
+                            t_lyric_rev_pointer -= 1;
+                        } else {
+                            // t_lyric_rev_pointer == 0
+                            // 翻译已经遍历到头
+                            have_t_lyric = false;
+                        }
                     }
                 }
             }

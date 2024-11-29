@@ -1,8 +1,9 @@
 use anyhow::{anyhow, Result};
 use gstreamer_play::{gst, Play, PlayVideoRenderer};
+use log::debug;
 use ncm_api::{NcmApi, SongInfo};
-use std::fmt;
 use rand::{thread_rng, Rng};
+use std::fmt;
 use tokio::sync::MutexGuard;
 
 #[derive(Clone, PartialEq)]
@@ -221,8 +222,33 @@ impl Player {
                 self.play_next(ncm_api_guard).await?;
                 Ok(())
             }
-            _ => { Err(anyhow!("start命令只在`列表循环`和`随机播放`模式下有效")) }
+            _ => Err(anyhow!("start命令只在`列表循环`和`随机播放`模式下有效")),
         }
+    }
+
+    /// 立刻播放下一首
+    pub async fn play_next_song_now<'a>(
+        &mut self,
+        ncm_api_guard: MutexGuard<'a, NcmApi>,
+    ) -> Result<()> {
+        if self.play_state == PlayState::Playing
+            || self.play_state == PlayState::Paused
+            || self.play_state == PlayState::Ended
+        {
+            // 当前单曲播放一秒后才可以切换到下一首，留出缓冲时间，防止切换过快
+            if let Some(position) = self.position() {
+                if position.seconds() >= 1 {
+                    self.update_next_to_play();
+                    debug!(
+                        "[{:?}] {:?}, ",
+                        self.current_song_index, self.current_song_info
+                    );
+                    self.play_next(ncm_api_guard).await?;
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -253,7 +279,7 @@ impl Player {
                 } else {
                     None
                 }
-            },
+            }
         };
     }
 
@@ -267,17 +293,19 @@ impl Player {
     async fn play_next<'a>(&mut self, ncm_api_guard: MutexGuard<'a, NcmApi>) -> Result<()> {
         if let Some(mut song_info) = self.current_song_info.clone() {
             // 获取歌曲 uri
-            song_info.song_url = ncm_api_guard.get_song_url(song_info.id).await?.url;
-            self.current_song_info = Some(song_info.clone());
+            if let Ok(url) = ncm_api_guard.get_song_url(song_info.id).await {
+                song_info.song_url = url;
+                self.current_song_info = Some(song_info.clone());
 
-            // 获取歌词
-            self.update_current_lyric_encoded(ncm_api_guard).await?;
+                // 获取歌词
+                self.update_current_lyric_encoded(ncm_api_guard).await?;
 
-            // 播放
-            self.play_new_song_by_uri(song_info.song_url.as_str());
+                // 播放
+                self.play_new_song_by_uri(song_info.song_url.as_str());
 
-            // // 播放状态
-            self.play_state = PlayState::Playing;
+                // // 播放状态
+                self.play_state = PlayState::Playing;
+            }
         } else {
             // 播放状态
             self.play_state = PlayState::Stopped;
@@ -303,8 +331,15 @@ impl Player {
                 self.current_song_lyrics = Some(lyrics);
                 self.current_song_lyric_timestamps = Some(timestamps);
                 self.current_song_lyric_index = Some(0);
+
+                return Ok(());
             }
         }
+
+        // 无歌词（纯音乐或网络异常）
+        self.current_song_lyrics = None;
+        self.current_song_lyric_timestamps = None;
+        self.current_song_lyric_index = None;
 
         Ok(())
     }

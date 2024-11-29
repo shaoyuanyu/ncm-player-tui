@@ -9,6 +9,8 @@ anyhow = "1.0.93"
 gstreamer = "0.23.3"
 gstreamer-play = "0.23.2"
 
+log = "0.4.22"
+
 ncm-api = { path = "../ncm-api" }
 
 rand = "0.8.5"

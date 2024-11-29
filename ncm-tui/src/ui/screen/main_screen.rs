@@ -311,7 +311,12 @@ impl<'a> Controller for MainScreen<'a> {
                 .height();
             let half_line_count = available_line_count / lyric_line_count / 2;
             let near_top_line = 0 + half_line_count;
-            let near_bottom_line = self.current_song_lyric_items.len() - 1 - half_line_count;
+            let near_bottom_line =
+                if self.current_song_lyric_items.len() - 1 - half_line_count >= half_line_count {
+                    self.current_song_lyric_items.len() - 1 - half_line_count
+                } else {
+                    half_line_count
+                };
             // 修正 offset
             if current_index >= near_top_line {
                 if current_index >= near_bottom_line {

@@ -153,6 +153,13 @@ impl<'a> App<'a> {
                         self.show_prompt(e.to_string().as_str());
                     }
                 }
+                Command::NextSong => {
+                    PLAYER
+                        .lock()
+                        .await
+                        .play_next_song_now(NCM_API.lock().await)
+                        .await?;
+                }
                 // 需要向下传递的事件
                 Command::Down
                 | Command::Up
@@ -251,11 +258,11 @@ impl<'a> App<'a> {
             KeyCode::F(1) => Command::GotoScreen(ScreenEnum::Help),
             KeyCode::Char('q') => Command::Quit,
             KeyCode::Char(':') => Command::EnterCommand,
+            KeyCode::Char('.') => Command::NextSong,
             //
             KeyCode::Char('k') => Command::Up,
             KeyCode::Char('j') => Command::Down,
-            KeyCode::Char(',') => Command::PrevTrack,
-            KeyCode::Char('.') => Command::NextTrack,
+            KeyCode::Char(',') => Command::PrevSong,
             KeyCode::Tab => Command::NextPanel,
             KeyCode::BackTab => Command::PrevPanel,
             _ => Command::Nop,
