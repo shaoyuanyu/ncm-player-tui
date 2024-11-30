@@ -156,14 +156,33 @@ impl<'a> Controller for MainScreen<'a> {
                 }
                 FocusPanel::PlaylistInside => {
                     match cmd {
-                        Command::Down => self.playlist_ui.state.select_next(),
+                        Command::Down => {
+                            // 直接使用 select_next() 存在越界问题
+                            if let (Some(selected), list_len) = (
+                                self.playlist_ui.state.selected(),
+                                self.playlist_ui.list.len(),
+                            ) {
+                                if selected < list_len - 1 {
+                                    self.playlist_ui.state.select_next();
+                                }
+                            }
+                        }
                         Command::Up => self.playlist_ui.state.select_previous(),
                         _ => {} // never happen
                     }
                 }
                 FocusPanel::LyricInside => {
                     match cmd {
-                        Command::Down => self.song_ui.state.select_next(),
+                        Command::Down => {
+                            // 直接使用 select_next() 存在越界问题
+                            if let (Some(selected), list_len) =
+                                (self.song_ui.state.selected(), self.song_ui.list.len())
+                            {
+                                if selected < list_len - 1 {
+                                    self.song_ui.state.select_next();
+                                }
+                            }
+                        }
                         Command::Up => self.song_ui.state.select_previous(),
                         _ => {} // never happen
                     }
