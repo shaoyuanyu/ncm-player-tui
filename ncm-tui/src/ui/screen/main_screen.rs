@@ -6,13 +6,18 @@ use anyhow::Result;
 use ncm_api::SongInfo;
 use ratatui::layout::Rect;
 use ratatui::prelude::*;
-use ratatui::style::palette::tailwind::{RED, SLATE};
+use ratatui::style::palette::tailwind;
 use ratatui::widgets::{Block, Borders, HighlightSpacing, List, ListItem};
 use ratatui::Frame;
 use std::mem;
 
-const SELECTED_STYLE: Style = Style::new().bg(SLATE.c800).add_modifier(Modifier::BOLD);
-const LYRIC_FOCUSED_STYLE: Style = Style::new().fg(RED.c600).add_modifier(Modifier::BOLD);
+const PANEL_SELECTED_BORDER_STYLE: Style = Style::new().fg(tailwind::BLUE.c900);
+const ITEM_SELECTED_STYLE: Style = Style::new()
+    .bg(tailwind::SLATE.c800)
+    .add_modifier(Modifier::BOLD);
+const LYRIC_FOCUSED_STYLE: Style = Style::new()
+    .fg(tailwind::RED.c600)
+    .add_modifier(Modifier::BOLD);
 
 #[derive(PartialEq)]
 pub enum FocusPanel {
@@ -257,22 +262,28 @@ impl<'a> Controller for MainScreen<'a> {
         self.playlist_ui = UIList {
             list: {
                 let mut list = List::new(self.playlist_items.clone())
-                    .block(
-                        Block::default()
+                    .block({
+                        let mut block = Block::default()
                             .title(format!("Playlist: {}\u{1F4DC}", self.playlist_name.clone()))
                             .title_bottom(
                                 Line::from(format!("User: {}\u{1F3A7}", self.user_name.clone()))
                                     .right_aligned(),
                             )
-                            .borders(Borders::ALL),
-                    )
+                            .borders(Borders::ALL);
+                        if self.current_focus_panel == FocusPanel::PlaylistOutside {
+                            block = block.border_style(PANEL_SELECTED_BORDER_STYLE);
+                        }
+
+                        block
+                    })
                     .style(*style);
-                list = match self.current_focus_panel {
-                    FocusPanel::PlaylistInside => {
-                        list.highlight_style(SELECTED_STYLE).highlight_symbol(">")
-                    }
-                    _ => list,
-                };
+                // highlight
+                if self.current_focus_panel == FocusPanel::PlaylistInside {
+                    list = list
+                        .highlight_style(ITEM_SELECTED_STYLE)
+                        .highlight_symbol(">")
+                }
+
                 list
             },
             state: mem::take(&mut self.playlist_ui.state),
@@ -283,10 +294,20 @@ impl<'a> Controller for MainScreen<'a> {
 
         self.song_ui = UIList {
             list: {
-                let mut list = List::new(self.current_song_lyric_items.clone()).style(*style);
+                let mut list = if !self.current_song_lyric_items.is_empty() {
+                    List::new(self.current_song_lyric_items.clone()).style(*style)
+                } else {
+                    List::new(vec![ListItem::new(Text::from(vec![
+                        Line::from("选中音乐后回车播放").centered(),
+                        Line::from("也可在`列表播放`或`随机播放`模式下输入\":start\"开始自动播放")
+                            .centered(),
+                    ]))])
+                    .style(*style)
+                };
+                // block
                 list = match self.current_song_info.clone() {
-                    Some(current_song_info) => list.block(
-                        Block::default()
+                    Some(current_song_info) => list.block({
+                        let mut block = Block::default()
                             .title(
                                 Line::from(format!("\u{1F3B5}{}", current_song_info.name))
                                     .left_aligned(),
@@ -299,16 +320,27 @@ impl<'a> Controller for MainScreen<'a> {
                                 Line::from(format!("\u{1F4DA}{}", current_song_info.album))
                                     .centered(),
                             )
-                            .borders(Borders::ALL),
-                    ),
-                    None => list.block(
-                        Block::default()
+                            .borders(Borders::ALL);
+                        if self.current_focus_panel == FocusPanel::LyricOutside {
+                            block = block.border_style(PANEL_SELECTED_BORDER_STYLE);
+                        }
+
+                        block
+                    }),
+                    None => list.block({
+                        let mut block = Block::default()
                             .title("\u{1F3B6}pick a song to play".to_string())
-                            .borders(Borders::ALL),
-                    ),
+                            .borders(Borders::ALL);
+                        if self.current_focus_panel == FocusPanel::LyricOutside {
+                            block = block.border_style(PANEL_SELECTED_BORDER_STYLE);
+                        }
+
+                        block
+                    }),
                 };
+                // highlight
                 list = if self.current_focus_panel == FocusPanel::LyricInside {
-                    list.highlight_style(SELECTED_STYLE)
+                    list.highlight_style(ITEM_SELECTED_STYLE)
                 } else {
                     list.highlight_style(LYRIC_FOCUSED_STYLE)
                         .highlight_spacing(HighlightSpacing::WhenSelected)
