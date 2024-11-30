@@ -264,6 +264,7 @@ impl Player {
         {
             if let Some(timestamps) = self.current_song_lyric_timestamps.clone() {
                 if index < timestamps.len() {
+                    self.current_song_lyric_index = Some(index);
                     let timestamp = timestamps[index];
                     self.play.seek(ClockTime::from_mseconds(timestamp));
                 }
