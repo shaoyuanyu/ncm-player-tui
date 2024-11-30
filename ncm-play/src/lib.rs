@@ -46,6 +46,8 @@ pub struct Player {
     play_state: PlayState,
     play_mode: PlayMode,
     //
+    volume: f64,
+    //
     current_playlist_name: String,
     current_playlist: Vec<SongInfo>,
     //
@@ -61,6 +63,7 @@ impl Player {
         gst::init().expect("Failed to initialize GST");
 
         let play = Play::new(None::<PlayVideoRenderer>);
+
         let mut config = play.config();
         config.set_user_agent(
             "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:100.0) Gecko/20100101 Firefox/100.0",
@@ -68,12 +71,15 @@ impl Player {
         config.set_position_update_interval(250);
         config.set_seek_accurate(true);
         play.set_config(config).unwrap();
-        play.set_volume(0.2);
+
+        let volume = 0.2;
+        play.set_volume(volume);
 
         Self {
             play,
             play_state: PlayState::Stopped,
             play_mode: PlayMode::Shuffle,
+            volume,
             current_playlist_name: String::new(),
             current_playlist: Vec::new(),
             current_song_index: None,
@@ -88,15 +94,17 @@ impl Player {
 /// setter & getter
 impl Player {
     pub fn set_volume(&mut self, volume: f64) {
+        self.volume = volume;
         self.play.set_volume(volume);
     }
 
     pub fn mute(&mut self) {
+        self.volume = 0.0;
         self.play.set_volume(0.0);
     }
 
     pub fn volume(&self) -> f64 {
-        self.play.volume()
+        self.volume
     }
 
     pub fn is_playing(&self) -> bool {
@@ -308,6 +316,7 @@ impl Player {
 
     fn play_new_song_by_uri(&mut self, uri: &str) {
         self.play.stop();
+        self.play.set_volume(self.volume);
         self.play.set_uri(Some(uri));
         self.play.play();
     }
