@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Result};
+use gstreamer::ClockTime;
 use gstreamer_play::{gst, Play, PlayVideoRenderer};
 use log::debug;
 use ncm_api::{NcmApi, SongInfo};
@@ -244,6 +245,23 @@ impl Player {
                         self.current_song_index, self.current_song_info
                     );
                     self.play_next(ncm_api_guard).await?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// 跳转到所给编号的时间戳处播放
+    pub async fn seek_to_timestamp_with_index(&mut self, index: usize) -> Result<()> {
+        if self.play_state == PlayState::Playing
+            || self.play_state == PlayState::Paused
+            || self.play_state == PlayState::Ended
+        {
+            if let Some(timestamps) = self.current_song_lyric_timestamps.clone() {
+                if index < timestamps.len() {
+                    let timestamp = timestamps[index];
+                    self.play.seek(ClockTime::from_mseconds(timestamp));
                 }
             }
         }

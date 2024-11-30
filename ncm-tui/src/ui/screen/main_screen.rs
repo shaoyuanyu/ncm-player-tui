@@ -11,9 +11,10 @@ use ratatui::widgets::{Block, Borders, HighlightSpacing, List, ListItem};
 use ratatui::Frame;
 use std::mem;
 
-const PLAYLIST_SELECTED_STYLE: Style = Style::new().bg(SLATE.c800).add_modifier(Modifier::BOLD);
-const LYRIC_SELECTED_STYLE: Style = Style::new().fg(RED.c600).add_modifier(Modifier::BOLD);
+const SELECTED_STYLE: Style = Style::new().bg(SLATE.c800).add_modifier(Modifier::BOLD);
+const LYRIC_FOCUSED_STYLE: Style = Style::new().fg(RED.c600).add_modifier(Modifier::BOLD);
 
+#[derive(PartialEq)]
 pub enum FocusPanel {
     PlaylistOutside,
     PlaylistInside,
@@ -84,12 +85,16 @@ impl<'a> Controller for MainScreen<'a> {
         // lyric
         if self.current_song_info == *player_guard.current_song_info_ref() {
             // 歌曲仍在播放，当前歌词行需更新；或者无歌曲正在播放
-            if self.song_ui.state.selected() != player_guard.current_song_lyric_index() {
-                self.song_ui
-                    .state
-                    .select(player_guard.current_song_lyric_index());
+            // current_focus_panel 不为 LyricInside 时，自动更新当前歌词行
+            // current_focus_panel 为 LyricInside 时，根据用户选择选中歌词行
+            if self.current_focus_panel != FocusPanel::LyricInside {
+                if self.song_ui.state.selected() != player_guard.current_song_lyric_index() {
+                    self.song_ui
+                        .state
+                        .select(player_guard.current_song_lyric_index());
 
-                result = Ok(true);
+                    result = Ok(true);
+                }
             }
         } else {
             // 切换到新歌
@@ -197,7 +202,17 @@ impl<'a> Controller for MainScreen<'a> {
                         )
                         .await?;
                 }
-                FocusPanel::LyricInside => {}
+                FocusPanel::LyricInside => {
+                    // 跳转到对应编号的时间戳处播放
+                    let index = self.song_ui.state.selected().unwrap_or(0);
+                    PLAYER
+                        .lock()
+                        .await
+                        .seek_to_timestamp_with_index(index)
+                        .await?;
+                    //
+                    self.current_focus_panel = FocusPanel::LyricOutside;
+                }
                 FocusPanel::PlaylistOutside => {
                     self.current_focus_panel = FocusPanel::PlaylistInside;
                 }
@@ -228,9 +243,9 @@ impl<'a> Controller for MainScreen<'a> {
                     )
                     .style(*style);
                 list = match self.current_focus_panel {
-                    FocusPanel::PlaylistInside => list
-                        .highlight_style(PLAYLIST_SELECTED_STYLE)
-                        .highlight_symbol(">"),
+                    FocusPanel::PlaylistInside => {
+                        list.highlight_style(SELECTED_STYLE).highlight_symbol(">")
+                    }
                     _ => list,
                 };
                 list
@@ -267,15 +282,12 @@ impl<'a> Controller for MainScreen<'a> {
                             .borders(Borders::ALL),
                     ),
                 };
-                // list = match self.current_focus_panel {
-                //     FocusPanel::LyricInside => list
-                //         .highlight_style(LYRIC_SELECTED_STYLE)
-                //         .highlight_spacing(HighlightSpacing::WhenSelected),
-                //     _ => list,
-                // };
-                list = list
-                    .highlight_style(LYRIC_SELECTED_STYLE)
-                    .highlight_spacing(HighlightSpacing::WhenSelected);
+                list = if self.current_focus_panel == FocusPanel::LyricInside {
+                    list.highlight_style(SELECTED_STYLE)
+                } else {
+                    list.highlight_style(LYRIC_FOCUSED_STYLE)
+                        .highlight_spacing(HighlightSpacing::WhenSelected)
+                };
                 list
             },
             state: mem::take(&mut self.song_ui.state),
