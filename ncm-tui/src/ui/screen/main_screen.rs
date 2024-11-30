@@ -2,6 +2,7 @@ use crate::config::Command;
 use crate::ui::Controller;
 use crate::{NCM_API, PLAYER};
 use anyhow::Result;
+use log::debug;
 use ncm_api::SongInfo;
 use ratatui::layout::Rect;
 use ratatui::prelude::*;
@@ -110,7 +111,7 @@ impl<'a> Controller for MainScreen<'a> {
                 .collect();
 
             // 更新 playlist_table 的 selected，防止悬空
-            self.playlist_table_state.select(Some(0));
+            self.playlist_table_state.select(None);
 
             result = Ok(true);
         }
@@ -164,7 +165,7 @@ impl<'a> Controller for MainScreen<'a> {
             }
 
             // 更新 song_ui selected，防止悬空
-            self.song_lyric_list_state.select(Some(0));
+            self.song_lyric_list_state.select(None);
 
             result = Ok(true);
         }
@@ -289,6 +290,25 @@ impl<'a> Controller for MainScreen<'a> {
                     self.current_focus_panel = FocusPanel::PlaylistInside;
                 }
             }
+            Command::GoToTop | Command::GoToBottom => {
+                if self.current_focus_panel == FocusPanel::PlaylistInside {
+                    match cmd {
+                        Command::GoToTop => self.playlist_table_state.select_first(),
+                        Command::GoToBottom => self.playlist_table_state.select_last(),
+                        _ => {} // never happen
+                    }
+                } else if self.current_focus_panel == FocusPanel::LyricInside {
+                    match cmd {
+                        Command::GoToTop => self.song_lyric_list_state.select_first(),
+                        Command::GoToBottom => {
+                            // 使用 self.song_lyric_list_state.select_last(); 会越界
+                            self.song_lyric_list_state
+                                .select(Some(self.song_lyric_list_items.len() - 1));
+                        }
+                        _ => {} // never happen
+                    }
+                }
+            }
             _ => {
                 return Ok(false);
             }
@@ -303,6 +323,12 @@ impl<'a> Controller for MainScreen<'a> {
 
         //
         self.update_song_lyric_view(style);
+
+        debug!(
+            "go bottom: {}/{}",
+            self.song_lyric_list_state.selected().unwrap_or(999),
+            self.song_lyric_list_items.len()
+        );
     }
 
     fn draw(&self, frame: &mut Frame, chunk: Rect) {

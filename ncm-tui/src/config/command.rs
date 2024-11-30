@@ -21,6 +21,8 @@ pub enum Command {
     Esc,
     Play,
     WhereIsThisSong,
+    GoToTop,
+    GoToBottom,
     //
     PrevSong,
     Nop,
@@ -68,6 +70,8 @@ impl Command {
                 Some(other) => Err(anyhow!("where: Invalid argument '{}'", other)),
                 None => Err(anyhow!("where: Missing argument")),
             },
+            Some("top") => Ok(Self::GoToTop),
+            Some("bottom") => Ok(Self::GoToBottom),
             Some(other) => Err(anyhow!("Invalid command: {}", other)),
             None => Ok(Self::Nop),
         }

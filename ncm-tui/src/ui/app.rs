@@ -204,7 +204,9 @@ impl<'a> App<'a> {
                 | Command::PrevPanel
                 | Command::Esc
                 | Command::Play
-                | Command::WhereIsThisSong => {
+                | Command::WhereIsThisSong
+                | Command::GoToTop
+                | Command::GoToBottom => {
                     // 先 update_model(), 再 handle_event()
                     // 取或值
                     // 若写成 self.need_re_update_view = self.need_re_update_view || match ... {} ，match块内的方法可能不被执行
