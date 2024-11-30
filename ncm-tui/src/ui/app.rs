@@ -1,3 +1,4 @@
+use crate::config::LOGO_TEXT;
 use crate::ui::widget::{BottomBar, CommandLine};
 use crate::{
     config::{AppMode, Command, ScreenEnum},
@@ -12,6 +13,8 @@ use crossterm::{
     terminal::{disable_raw_mode, LeaveAlternateScreen},
 };
 use ratatui::prelude::*;
+use ratatui::style::palette::tailwind;
+use ratatui::widgets::Paragraph;
 use std::collections::VecDeque;
 use std::io::Stdout;
 
@@ -41,7 +44,7 @@ impl<'a> App<'a> {
         let normal_style = Style::default();
 
         Self {
-            current_screen: ScreenEnum::Main,
+            current_screen: ScreenEnum::Launch,
             current_mode: AppMode::Normal,
             need_re_update_view: true,
             command_queue: VecDeque::new(),
@@ -55,11 +58,40 @@ impl<'a> App<'a> {
         }
     }
 
+    /// 绘制启动第一帧（网易云logo）
+    pub fn draw_launch_screen(&mut self) -> Result<()> {
+        let mut logo_lines = vec![];
+        for logo_line in LOGO_TEXT.lines() {
+            logo_lines.push(Line::from(logo_line).centered());
+        }
+        let logo_lines_count = logo_lines.len();
+
+        // 绘制
+        self.terminal.draw(|frame| {
+            let chunk = frame.area();
+
+            // 竖直居中
+            let available_line_count = chunk.height as usize;
+            if available_line_count > logo_lines_count {
+                for _ in 0..(available_line_count - logo_lines_count) / 2 {
+                    logo_lines.insert(0, Line::from(""))
+                }
+            }
+
+            let logo_paragraph = Paragraph::new(logo_lines)
+                .bg(tailwind::RED.c500)
+                .fg(tailwind::WHITE);
+
+            frame.render_widget(&logo_paragraph, chunk);
+        })?;
+
+        Ok(())
+    }
+
     /// cookie 登录/二维码登录后均调用
     pub async fn init_after_login(&mut self) -> Result<()> {
-        let ncm_api_guard = NCM_API.lock().await;
-
-        if let (Some(playlist_name), Some(playlist)) = ncm_api_guard.user_favorite_songlist() {
+        if let (Some(playlist_name), Some(playlist)) = NCM_API.lock().await.user_favorite_songlist()
+        {
             PLAYER
                 .lock()
                 .await
@@ -69,6 +101,11 @@ impl<'a> App<'a> {
         self.switch_screen(ScreenEnum::Main).await;
 
         Ok(())
+    }
+
+    /// 尝试 cookie 登录失败后调用
+    pub async fn init_after_no_login(&mut self) {
+        self.switch_screen(ScreenEnum::Main).await;
     }
 
     pub fn restore_terminal(&mut self) -> Result<()> {
@@ -88,6 +125,7 @@ impl<'a> App<'a> {
             ScreenEnum::Help => false,
             ScreenEnum::Login => self.update_login_model().await?,
             ScreenEnum::Main => self.main_screen.update_model().await?,
+            _ => false,
         };
 
         // bottom_bar
@@ -174,6 +212,7 @@ impl<'a> App<'a> {
                         ScreenEnum::Main => self.main_screen.handle_event(cmd).await?,
                         ScreenEnum::Login => self.login_screen.handle_event(cmd).await?,
                         ScreenEnum::Help => self.help_screen.handle_event(cmd).await?,
+                        _ => false,
                     } || self.need_re_update_view;
                 }
                 _ => {}
@@ -190,6 +229,7 @@ impl<'a> App<'a> {
                 ScreenEnum::Help => {}
                 ScreenEnum::Login => self.login_screen.update_view(&self.normal_style),
                 ScreenEnum::Main => self.main_screen.update_view(&self.normal_style),
+                _ => {}
             }
         }
 
@@ -206,6 +246,12 @@ impl<'a> App<'a> {
     }
 
     pub fn draw(&mut self) -> Result<()> {
+        // Launch Screen 需要全屏绘制
+        if self.current_screen == ScreenEnum::Launch {
+            self.draw_launch_screen()?;
+            return Ok(());
+        }
+
         //
         self.update_view();
 
@@ -229,6 +275,7 @@ impl<'a> App<'a> {
                 ScreenEnum::Help => self.help_screen.draw(frame, chunks[0]),
                 ScreenEnum::Login => self.login_screen.draw(frame, chunks[0]),
                 ScreenEnum::Main => self.main_screen.draw(frame, chunks[0]),
+                _ => {}
             }
 
             // 渲染 bottom_bar

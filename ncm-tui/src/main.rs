@@ -16,6 +16,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
 use tokio::task;
+use tokio::time::sleep;
 
 const POLL_DURATION: Duration = Duration::from_millis(100);
 
@@ -35,10 +36,15 @@ async fn main() -> Result<()> {
 
     let app = Arc::new(Mutex::new(App::new(create_terminal()?)));
 
+    // 绘制第一帧（launch screen）
+    app.lock().await.draw_launch_screen()?;
+
     // 创建 NCM_API 时会默认尝试 cookie 登录，在新线程中检查 cookie 状态并初始化
     let app2 = Arc::clone(&app);
     let ncm_api_2 = Arc::clone(&NCM_API);
     task::spawn(async move {
+        sleep(Duration::from_secs(1)).await; // 给启动帧留缓冲
+
         if ncm_api_2
             .lock()
             .await
@@ -51,6 +57,8 @@ async fn main() -> Result<()> {
                 .init_after_login()
                 .await
                 .expect("Couldn't initialize application");
+        } else {
+            app2.lock().await.init_after_no_login().await;
         }
     });
 

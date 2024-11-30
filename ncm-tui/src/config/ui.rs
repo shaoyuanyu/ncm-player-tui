@@ -11,4 +11,5 @@ pub enum ScreenEnum {
     // Playlist,
     Login,
     Help,
+    Launch,
 }
