@@ -51,6 +51,7 @@ impl Command {
                 }
                 None => Err(anyhow!("volume: Missing argument NUMBER")),
             },
+            Some("mute") => Ok(Self::SetVolume(0.0)),
             Some("mode") => match tokens.next() {
                 Some("single") => Ok(SwitchPlayMode(PlayMode::Single)),
                 Some("sr" | "single-repeat") => Ok(SwitchPlayMode(PlayMode::SingleRepeat)),
