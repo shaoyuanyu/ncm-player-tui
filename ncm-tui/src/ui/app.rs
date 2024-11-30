@@ -297,6 +297,8 @@ impl<'a> App<'a> {
         let cmd = match key_code {
             KeyCode::Down => Command::Down,
             KeyCode::Up => Command::Up,
+            KeyCode::Char('j') => Command::Down,
+            KeyCode::Char('k') => Command::Up,
             KeyCode::Char(' ') => Command::PlayOrPause,
             KeyCode::Enter => Command::Play,
             KeyCode::Esc => Command::Esc,
@@ -305,12 +307,11 @@ impl<'a> App<'a> {
             KeyCode::Char('1') => Command::GotoScreen(ScreenEnum::Main),
             KeyCode::Char('0') => Command::GotoScreen(ScreenEnum::Help),
             KeyCode::F(1) => Command::GotoScreen(ScreenEnum::Help),
-            KeyCode::Char('q') => Command::Quit,
-            KeyCode::Char(':') => Command::EnterCommand,
             KeyCode::Char('.') => Command::NextSong,
+            KeyCode::Char(':') => Command::EnterCommand,
+            KeyCode::Char('q') => Command::Quit,
             //
-            KeyCode::Char('k') => Command::Up,
-            KeyCode::Char('j') => Command::Down,
+
             KeyCode::Char(',') => Command::PrevSong,
             KeyCode::Tab => Command::NextPanel,
             KeyCode::BackTab => Command::PrevPanel,
