@@ -2,7 +2,6 @@
 mod help_screen;
 mod login_screen;
 mod main_screen;
-mod playlist_screen;
 
 //
 pub use help_screen::HelpScreen;

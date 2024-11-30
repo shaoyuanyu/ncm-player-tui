@@ -27,7 +27,6 @@ pub struct App<'a> {
 
     // view
     main_screen: MainScreen<'a>,
-    // playlist_screen: PlaylistScreen<'a>,
     login_screen: LoginScreen<'a>,
     help_screen: HelpScreen<'a>,
     command_line: CommandLine<'a>,
