@@ -20,6 +20,7 @@ pub enum Command {
     PrevPanel,
     Esc,
     Play,
+    WhereIsThisSong,
     //
     PrevSong,
     Nop,
@@ -62,6 +63,11 @@ impl Command {
             },
             Some("next") => Ok(Self::NextSong),
             Some("start") => Ok(Self::StartPlay),
+            Some("where") => match tokens.next() {
+                Some("this") => Ok(Self::WhereIsThisSong),
+                Some(other) => Err(anyhow!("where: Invalid argument '{}'", other)),
+                None => Err(anyhow!("where: Missing argument")),
+            },
             Some(other) => Err(anyhow!("Invalid command: {}", other)),
             None => Ok(Self::Nop),
         }

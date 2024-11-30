@@ -82,7 +82,7 @@ impl<'a> Controller for MainScreen<'a> {
             self.playlist_ui.state.select(None);
         }
 
-        // lyric
+        // song
         if self.current_song_info == *player_guard.current_song_info_ref() {
             // 歌曲仍在播放，当前歌词行需更新；或者无歌曲正在播放
             // current_focus_panel 不为 LyricInside 时，自动更新当前歌词行
@@ -220,6 +220,12 @@ impl<'a> Controller for MainScreen<'a> {
                     self.current_focus_panel = FocusPanel::LyricInside;
                 }
             },
+            Command::WhereIsThisSong => {
+                if let Some(index) = PLAYER.lock().await.current_song_index() {
+                    self.playlist_ui.state.select(Some(index));
+                    self.current_focus_panel = FocusPanel::PlaylistInside;
+                }
+            }
             _ => {
                 return Ok(false);
             }

@@ -131,6 +131,10 @@ impl Player {
         &self.current_song_info
     }
 
+    pub fn current_song_index(&self) -> Option<usize> {
+        self.current_song_index.clone()
+    }
+
     pub fn current_song_lyrics(&self) -> Option<Vec<(String, Option<String>)>> {
         self.current_song_lyrics.clone()
     }
