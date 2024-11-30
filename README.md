@@ -4,9 +4,13 @@
 
 tui 界面基于 `ratatui` crate 开发。
 
+## UI 展示
+
+![ui](./doc/ui.png)
+
 ## 依赖
 
-Gstreamer
+[Gstreamer](https://gstreamer.freedesktop.org/download)
 
 ## 参考项目
 

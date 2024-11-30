@@ -18,6 +18,3 @@ serde_json = "1.0.133"
 tokio = "1.41.1"
 urlqstring = "0.3.5"
 log = "0.4.22"
-
-[dev-dependencies]
-async-std = { version = "1.13.0", features = ["attributes"] }
