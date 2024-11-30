@@ -32,7 +32,7 @@ lazy_static! {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // env_logger::init();
+    env_logger::init();
 
     let app = Arc::new(Mutex::new(App::new(create_terminal()?)));
 

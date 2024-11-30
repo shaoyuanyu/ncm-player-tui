@@ -2,7 +2,6 @@ use crate::config::Command;
 use crate::ui::Controller;
 use crate::{NCM_API, PLAYER};
 use anyhow::Result;
-use log::debug;
 use ncm_api::SongInfo;
 use ratatui::layout::Rect;
 use ratatui::prelude::*;
@@ -294,14 +293,18 @@ impl<'a> Controller for MainScreen<'a> {
                 if self.current_focus_panel == FocusPanel::PlaylistInside {
                     match cmd {
                         Command::GoToTop => self.playlist_table_state.select_first(),
-                        Command::GoToBottom => self.playlist_table_state.select_last(),
+                        Command::GoToBottom => {
+                            // 使用 select_last() 会越界
+                            self.playlist_table_state
+                                .select(Some(self.playlist_table_rows.len() - 1));
+                        }
                         _ => {} // never happen
                     }
                 } else if self.current_focus_panel == FocusPanel::LyricInside {
                     match cmd {
                         Command::GoToTop => self.song_lyric_list_state.select_first(),
                         Command::GoToBottom => {
-                            // 使用 self.song_lyric_list_state.select_last(); 会越界
+                            // 使用 select_last() 会越界
                             self.song_lyric_list_state
                                 .select(Some(self.song_lyric_list_items.len() - 1));
                         }
@@ -323,12 +326,6 @@ impl<'a> Controller for MainScreen<'a> {
 
         //
         self.update_song_lyric_view(style);
-
-        debug!(
-            "go bottom: {}/{}",
-            self.song_lyric_list_state.selected().unwrap_or(999),
-            self.song_lyric_list_items.len()
-        );
     }
 
     fn draw(&self, frame: &mut Frame, chunk: Rect) {

@@ -184,7 +184,7 @@ impl Player {
                 let position_msec = position.mseconds();
                 let duration_msec = duration.mseconds();
 
-                if position_msec >= duration_msec {
+                if duration_msec - position_msec <= 10 {
                     self.play_state = PlayState::Ended;
                 }
             }
