@@ -9,21 +9,19 @@ use ratatui::text::{Line, Text};
 use ratatui::widgets::{Block, Borders, Gauge, Paragraph};
 use ratatui::Frame;
 
-//
-const CHAR_FLAG_PLAY: char = '\u{f040a}';
-const CHAR_FLAG_PAUSE: char = '\u{f03e4}';
-
 pub struct BottomBar<'a> {
     // model
     info_bar_text: Text<'a>,
     //
     playback_ratio: f64,
     playback_label: String,
+    song_name: Option<String>,
+    singer_name: Option<String>,
     //
     volume: f64,
 
     // view
-    info_bar: Paragraph<'a>,
+    control_bar: Paragraph<'a>,
     playback_bar: Gauge<'a>,
     volume_bar: Gauge<'a>,
 }
@@ -34,8 +32,10 @@ impl<'a> BottomBar<'a> {
             info_bar_text: Text::default(),
             playback_ratio: 0.0,
             playback_label: String::new(),
+            song_name: None,
+            singer_name: None,
             volume: 0.0,
-            info_bar: Paragraph::default(),
+            control_bar: Paragraph::default(),
             playback_bar: Gauge::default(),
             volume_bar: Gauge::default(),
         }
@@ -46,15 +46,15 @@ impl<'a> Controller for BottomBar<'a> {
     async fn update_model(&mut self) -> Result<bool> {
         let player_guard = PLAYER.lock().await;
 
-        // info_bar
+        // control_bar
         self.info_bar_text = Text::from(
             Line::from(format!(
-                "{}  |  {}  ",
+                " {}  |  {}  ",
                 player_guard.play_mode(),
                 if player_guard.is_playing() {
-                    CHAR_FLAG_PAUSE
+                    '\u{f03e4}'
                 } else {
-                    CHAR_FLAG_PLAY
+                    '\u{f040a}'
                 },
             ))
             .centered(),
@@ -77,6 +77,10 @@ impl<'a> Controller for BottomBar<'a> {
             self.playback_ratio = 0.0;
             self.playback_label = String::from("--:--/--:--");
         };
+        if let Some(song_info) = player_guard.current_song_info_ref().clone() {
+            self.song_name = Some(song_info.name.clone());
+            self.singer_name = Some(song_info.singer.clone());
+        }
 
         // volume_bar
         self.volume = player_guard.volume();
@@ -90,12 +94,22 @@ impl<'a> Controller for BottomBar<'a> {
     }
 
     fn update_view(&mut self, style: &Style) {
-        self.info_bar = Paragraph::new(self.info_bar_text.clone())
+        self.control_bar = Paragraph::new(self.info_bar_text.clone())
             .block(Block::default().borders(Borders::ALL))
             .style(*style);
 
         self.playback_bar = Gauge::default()
-            .block(Block::default().borders(Borders::ALL).style(*style))
+            .block({
+                let mut block = Block::default().borders(Borders::ALL).style(*style);
+                if let (Some(song_name), Some(artist_name)) =
+                    (self.song_name.clone(), self.singer_name.clone())
+                {
+                    block = block
+                        .title_top(Line::from(format!("{}", song_name)).centered())
+                        .title_bottom(Line::from(format!("{}", artist_name)).centered());
+                }
+                block
+            })
             .gauge_style(tailwind::PINK.c300)
             .ratio(self.playback_ratio)
             .label(self.playback_label.clone());
@@ -124,8 +138,8 @@ impl<'a> Controller for BottomBar<'a> {
             )
             .split(chunk);
 
-        // info_bar
-        frame.render_widget(&self.info_bar, bottom_bar_chunks[0]);
+        // control_bar
+        frame.render_widget(&self.control_bar, bottom_bar_chunks[0]);
 
         // playback_bar
         frame.render_widget(&self.playback_bar, bottom_bar_chunks[1]);

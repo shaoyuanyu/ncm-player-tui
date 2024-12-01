@@ -1,4 +1,4 @@
-use crate::config::LOGO_TEXT;
+use crate::config::{LOGO_LINES};
 use crate::ui::widget::{BottomBar, CommandLine};
 use crate::{
     config::{AppMode, Command, ScreenEnum},
@@ -59,8 +59,8 @@ impl<'a> App<'a> {
 
     /// 绘制启动第一帧（网易云logo）
     pub fn draw_launch_screen(&mut self) -> Result<()> {
-        let mut logo_lines = vec![];
-        for logo_line in LOGO_TEXT.lines() {
+        let mut logo_lines = Vec::new();
+        for logo_line in LOGO_LINES {
             logo_lines.push(Line::from(logo_line).centered());
         }
         let logo_lines_count = logo_lines.len();
@@ -311,7 +311,6 @@ impl<'a> App<'a> {
             KeyCode::Char(':') => Command::EnterCommand,
             KeyCode::Char('q') => Command::Quit,
             //
-
             KeyCode::Char(',') => Command::PrevSong,
             KeyCode::Tab => Command::NextPanel,
             KeyCode::BackTab => Command::PrevPanel,

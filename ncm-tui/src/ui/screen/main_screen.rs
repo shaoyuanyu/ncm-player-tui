@@ -31,8 +31,6 @@ pub struct MainScreen<'a> {
     // model
     current_focus_panel: FocusPanel,
     //
-    user_name: String,
-    //
     playlist_name: String,
     playlist_table_rows: Vec<Row<'a>>,
     playlist_table_state: TableState,
@@ -55,17 +53,12 @@ impl<'a> MainScreen<'a> {
 
         Self {
             current_focus_panel: FocusPanel::PlaylistOutside,
-
-            user_name: String::new(),
-
             playlist_name: String::new(),
             playlist_table_rows: Vec::new(),
             playlist_table_state: TableState::new(),
-
             song_info: None,
             song_lyric_list_items,
             song_lyric_list_state: ListState::default(),
-
             playlist_table: Table::default(),
             song_lyric_list: List::default(),
         }
@@ -77,15 +70,6 @@ impl<'a> Controller for MainScreen<'a> {
         let mut result = Ok(false);
 
         let player_guard = PLAYER.lock().await;
-
-        // username
-        if self.user_name.is_empty() {
-            if let Some(login_info) = NCM_API.lock().await.login_info() {
-                self.user_name = login_info.nickname;
-            }
-
-            result = Ok(true);
-        }
 
         // playlist
         if self.playlist_name != *player_guard.current_playlist_name_ref() {
@@ -379,10 +363,6 @@ impl<'a> MainScreen<'a> {
         .block({
             let mut block = Block::default()
                 .title(format!("Playlist: {}\u{1F4DC}", self.playlist_name.clone()))
-                .title_bottom(
-                    Line::from(format!("User: {}\u{1F3A7}", self.user_name.clone()))
-                        .right_aligned(),
-                )
                 .borders(Borders::ALL);
             if self.current_focus_panel == FocusPanel::PlaylistOutside {
                 block = block.border_style(PANEL_SELECTED_BORDER_STYLE);

@@ -26,16 +26,7 @@ impl<'a> HelpScreen<'a> {
             Play Next Song:                         {}\n\
             *Switch To Command Line Mode:           {}\n\
             Quit:                                   {}",
-            "↑ / k",
-            "↓ / j",
-            "\u{2423} (Space)",
-            "←",
-            "→",
-            "1",
-            "0 / F1",
-            ">",
-            ":",
-            "q",
+            "↑ / k", "↓ / j", "\u{2423} (Space)", "←", "→", "1", "0 / F1", ">", ":", "q",
         ));
         let normal_mode_help_page = Paragraph::new(normal_mode_help_text)
             .block(Block::default().title("普通模式").borders(Borders::ALL))
@@ -105,7 +96,7 @@ impl<'a> Controller for HelpScreen<'a> {
     fn draw(&self, frame: &mut Frame, chunk: Rect) {
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+            .constraints([Constraint::Percentage(35), Constraint::Percentage(65)].as_ref())
             .split(chunk);
 
         frame.render_widget(&self.normal_mode_help_page, chunks[0]);
