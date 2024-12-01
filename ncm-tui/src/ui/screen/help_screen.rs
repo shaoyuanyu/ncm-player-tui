@@ -26,8 +26,10 @@ impl<'a> HelpScreen<'a> {
             Play Next Song:                         {}\n\
             Play Previous Song:                     {}\n\
             *Switch To Command Line Mode:           {}\n\
+            Search Forward:                         {}\n\
+            Search Backward:                        {}\n\
             Quit:                                   {}",
-            "↑ / k", "↓ / j", "\u{2423} (Space)", "←", "→", "1", "0 / F1", ">", "<", ":", "q",
+            "↑ / k", "↓ / j", "\u{2423} (Space)", "←", "→", "1", "0 / F1", ">", "<", ":", "/", "?", "q",
         ));
         let normal_mode_help_page = Paragraph::new(normal_mode_help_text)
             .block(Block::default().title("普通模式").borders(Borders::ALL))
@@ -53,7 +55,9 @@ impl<'a> HelpScreen<'a> {
             Start Auto Play:                        {} (Only under `list repeat mode` or `shuffle mode`)\n\
             Jump To Current Song In Playlist:       {}\n\
             Jump To Top:                            {}\n\
-            Jump To Bottom:                         {}",
+            Jump To Bottom:                         {}\n\
+            Search Forward:                         {}\n\
+            Search Backward:                        {}",
             "q / quit / exit",
             "screen 0 / 1",
             "screen help / main",
@@ -73,6 +77,8 @@ impl<'a> HelpScreen<'a> {
             "where this",
             "top",
             "bottom",
+            "/ xxx",
+            "? xxx",
         ));
         let commandline_mode_help_page = Paragraph::new(commandline_mode_help_text)
             .block(Block::default().title("命令行模式").borders(Borders::ALL))
