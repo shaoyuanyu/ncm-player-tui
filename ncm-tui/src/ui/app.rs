@@ -50,7 +50,7 @@ impl<'a> App<'a> {
             main_screen: MainScreen::new(&normal_style),
             login_screen: LoginScreen::new(&normal_style),
             help_screen: HelpScreen::new(&normal_style),
-            command_line: CommandLine::new(&normal_style),
+            command_line: CommandLine::new(),
             bottom_bar: BottomBar::new(&normal_style),
             terminal,
             normal_style,
@@ -152,12 +152,10 @@ impl<'a> App<'a> {
                             .push_back(Command::SearchBackward(search_keywords.clone()));
                     }
                     (AppMode::Search(_), KeyCode::Esc) => {
-                        self.command_line.reset();
                         self.back_to_normal_mode();
                     }
                     (AppMode::Search(_), KeyCode::Enter | KeyCode::Char(':')) => {
                         // 返回 normal 模式，同时解析对应的命令，后续执行
-                        self.command_line.reset();
                         self.back_to_normal_mode();
                         self.get_command_from_key(key_event.code);
                     }
@@ -173,20 +171,19 @@ impl<'a> App<'a> {
                     // CommandLine 模式
                     (AppMode::CommandLine, KeyCode::Enter) => {
                         self.parse_command();
-                        self.back_to_normal_mode();
                     }
                     (AppMode::CommandLine, KeyCode::Esc) => {
-                        self.command_line.reset();
                         self.back_to_normal_mode();
                     }
                     (AppMode::CommandLine, KeyCode::Backspace) => {
-                        if self.command_line.textarea.lines()[0] == "" {
-                            self.command_line.reset();
+                        if self.command_line.is_content_empty() {
                             self.back_to_normal_mode();
+                        } else {
+                            self.command_line.input(key_event);
                         }
                     }
                     (AppMode::CommandLine, _) => {
-                        self.command_line.textarea.input(key_event);
+                        self.command_line.input(key_event);
                     }
                 }
             }
@@ -221,7 +218,8 @@ impl<'a> App<'a> {
                 }
                 Command::StartPlay => {
                     if let Err(e) = PLAYER.lock().await.start_play(NCM_API.lock().await).await {
-                        self.show_prompt(e.to_string().as_str());
+                        // self.show_prompt(e.to_string().as_str());
+                        self.command_line.set_content(e.to_string().as_str());
                     }
                 }
                 Command::NextSong => {
@@ -292,11 +290,6 @@ impl<'a> App<'a> {
         self.bottom_bar.update_view(&self.normal_style);
 
         // command_line
-        let show_cursor = match self.current_mode {
-            AppMode::CommandLine => true,
-            _ => false,
-        };
-        self.command_line.set_cursor_visibility(show_cursor);
         self.command_line.update_view(&self.normal_style);
     }
 
@@ -365,15 +358,13 @@ impl<'a> App<'a> {
             KeyCode::Char(':') => Command::EnterCommand,
             KeyCode::Char('q') => Command::Quit,
             KeyCode::Char('/') => {
-                self.command_line.reset();
-                self.command_line.textarea.insert_str("/ ");
-                self.current_mode = AppMode::CommandLine;
+                self.switch_to_search_input_mode();
+                self.command_line.set_content("/ ");
                 Command::Nop
             }
             KeyCode::Char('?') => {
-                self.command_line.reset();
-                self.command_line.textarea.insert_str("? ");
-                self.current_mode = AppMode::CommandLine;
+                self.switch_to_search_input_mode();
+                self.command_line.set_content("? ");
                 Command::Nop
             }
             //
@@ -386,36 +377,39 @@ impl<'a> App<'a> {
     }
 
     fn parse_command(&mut self) {
-        let input_cmd = self.command_line.get_contents();
+        let input_cmd = self.command_line.get_content();
 
-        self.command_line.reset();
+        self.back_to_normal_mode();
 
         match Command::parse(&input_cmd) {
             Ok(cmd) => {
                 self.command_queue.push_back(cmd);
             }
             Err(e) => {
-                self.show_prompt(format!("{e}").as_str());
+                self.command_line.set_content(format!("{e}").as_str());
             }
         }
     }
 
     fn back_to_normal_mode(&mut self) {
         self.current_mode = AppMode::Normal;
+        self.command_line.set_to_normal_mode();
     }
 
     fn switch_to_command_line_mode(&mut self) {
         self.current_mode = AppMode::CommandLine;
-        self.command_line.reset();
-        self.command_line.set_prompt(":");
+        self.command_line.set_to_command_line_mode();
     }
 
     fn switch_to_search_mode(&mut self, search_keywords: Vec<String>) {
         self.current_mode = AppMode::Search(search_keywords);
+        self.command_line.set_to_search_mode()
     }
 
-    fn show_prompt(&mut self, text: &str) {
-        self.command_line.textarea.insert_str(text);
+    /// 输入搜索命令时特殊的混合模式
+    fn switch_to_search_input_mode(&mut self) {
+        self.current_mode = AppMode::CommandLine;
+        self.command_line.set_to_search_mode();
     }
 
     async fn update_login_model(&mut self) -> Result<bool> {
@@ -433,7 +427,8 @@ impl<'a> App<'a> {
 
     async fn switch_screen(&mut self, to_screen: ScreenEnum) {
         if to_screen == ScreenEnum::Login && NCM_API.lock().await.is_login() {
-            self.show_prompt("you have to logout from current account first!");
+            self.command_line
+                .set_content("you have to logout from current account first!");
             return;
         }
 
