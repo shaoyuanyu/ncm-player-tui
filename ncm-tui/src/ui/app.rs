@@ -1,4 +1,4 @@
-use crate::config::{LOGO_LINES};
+use crate::config::LOGO_LINES;
 use crate::ui::widget::{BottomBar, CommandLine};
 use crate::{
     config::{AppMode, Command, ScreenEnum},
@@ -197,6 +197,13 @@ impl<'a> App<'a> {
                         .play_next_song_now(NCM_API.lock().await)
                         .await?;
                 }
+                Command::PrevSong => {
+                    PLAYER
+                        .lock()
+                        .await
+                        .play_prev_song_now(NCM_API.lock().await)
+                        .await?;
+                }
                 // 需要向下传递的事件
                 Command::Down
                 | Command::Up
@@ -308,10 +315,10 @@ impl<'a> App<'a> {
             KeyCode::Char('0') => Command::GotoScreen(ScreenEnum::Help),
             KeyCode::F(1) => Command::GotoScreen(ScreenEnum::Help),
             KeyCode::Char('.') => Command::NextSong,
+            KeyCode::Char(',') => Command::PrevSong,
             KeyCode::Char(':') => Command::EnterCommand,
             KeyCode::Char('q') => Command::Quit,
             //
-            KeyCode::Char(',') => Command::PrevSong,
             KeyCode::Tab => Command::NextPanel,
             KeyCode::BackTab => Command::PrevPanel,
             _ => Command::Nop,

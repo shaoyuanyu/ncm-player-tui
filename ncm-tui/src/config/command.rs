@@ -13,6 +13,7 @@ pub enum Command {
     SwitchPlayMode(PlayMode),
     StartPlay,
     NextSong,
+    PrevSong,
     //
     Down,
     Up,
@@ -24,7 +25,6 @@ pub enum Command {
     GoToTop,
     GoToBottom,
     //
-    PrevSong,
     Nop,
 }
 
@@ -64,6 +64,7 @@ impl Command {
                 None => Err(anyhow!("switch: Missing argument PLAY_MODE")),
             },
             Some("next") => Ok(Self::NextSong),
+            Some("prev" | "previous") => Ok(Self::PrevSong),
             Some("start") => Ok(Self::StartPlay),
             Some("where") => match tokens.next() {
                 Some("this") => Ok(Self::WhereIsThisSong),

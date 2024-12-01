@@ -50,6 +50,7 @@ pub struct Player {
     //
     current_playlist_name: String,
     current_playlist: Vec<SongInfo>,
+    play_index_history_stack: Vec<usize>, // 历史记录，保存播放的歌曲在 playlist 中的 index，栈顶为当前播放
     //
     current_song_index: Option<usize>,
     current_song_info: Option<SongInfo>,
@@ -82,6 +83,7 @@ impl Player {
             volume,
             current_playlist_name: String::new(),
             current_playlist: Vec::new(),
+            play_index_history_stack: Vec::new(),
             current_song_index: None,
             current_song_info: None,
             current_song_lyrics: None,
@@ -119,11 +121,11 @@ impl Player {
         self.play_mode = mode;
     }
 
-    pub fn duration(&self) -> Option<gst::ClockTime> {
+    pub fn duration(&self) -> Option<ClockTime> {
         self.play.duration()
     }
 
-    pub fn position(&self) -> Option<gst::ClockTime> {
+    pub fn position(&self) -> Option<ClockTime> {
         self.play.position()
     }
 
@@ -169,6 +171,7 @@ impl Player {
     pub fn switch_playlist(&mut self, playlist_name: String, playlist: Vec<SongInfo>) {
         self.current_playlist_name = playlist_name;
         self.current_playlist = playlist;
+        self.play_index_history_stack = Vec::new();
         self.current_song_index = if self.current_playlist.is_empty() {
             None
         } else {
@@ -248,15 +251,44 @@ impl Player {
             || self.play_state == PlayState::Paused
             || self.play_state == PlayState::Ended
         {
-            // 当前单曲播放一秒后才可以切换到下一首，留出缓冲时间，防止切换过快
+            // 当前单曲播放半秒后才可以切换到下一首，留出缓冲时间，防止切换过快
             if let Some(position) = self.position() {
-                if position.seconds() >= 1 {
+                if position.mseconds() >= 500 {
                     self.update_next_to_play();
+
                     debug!(
                         "[{:?}] {:?}, ",
                         self.current_song_index, self.current_song_info
                     );
+
                     self.play_next(ncm_api_guard).await?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// 立刻播放上一首
+    pub async fn play_prev_song_now<'a>(
+        &mut self,
+        ncm_api_guard: MutexGuard<'a, NcmApi>,
+    ) -> Result<()> {
+        // 当前单曲播放半秒后才可以切换到上一首，留出缓冲时间，防止切换过快
+        if let Some(position) = self.position() {
+            if position.mseconds() >= 500 {
+                // 出栈历史记录
+                if let Some(current_song_index) = self.play_index_history_stack.pop() {
+                    if let Some(prev_song_index) = self.play_index_history_stack.pop() {
+                        // 播放上一首
+                        self.current_song_index = Some(prev_song_index);
+                        self.current_song_info =
+                            Some(self.current_playlist[prev_song_index].clone());
+                        self.play_next(ncm_api_guard).await?;
+                    } else {
+                        // 无上一首（当前为第一首播放）
+                        self.play_index_history_stack.push(current_song_index);
+                    }
                 }
             }
         }
@@ -286,6 +318,7 @@ impl Player {
 /// private
 impl Player {
     /// 根据模式更新下一首播放的歌曲
+    /// 更新 self.current_song_info & self.current_song_index
     fn update_next_to_play(&mut self) {
         self.current_song_info = match self.play_mode {
             PlayMode::Single => None,
@@ -327,7 +360,14 @@ impl Player {
             // 获取歌曲 uri
             if let Ok(url) = ncm_api_guard.get_song_url(song_info.id).await {
                 song_info.song_url = url;
+
+                // 更新当前歌曲信息
                 self.current_song_info = Some(song_info.clone());
+
+                // 入栈播放历史
+                if let Some(index) = self.current_song_index {
+                    self.play_index_history_stack.push(index);
+                }
 
                 // 获取歌词
                 self.update_current_lyric_encoded(ncm_api_guard).await?;
@@ -335,7 +375,7 @@ impl Player {
                 // 播放
                 self.play_new_song_by_uri(song_info.song_url.as_str());
 
-                // // 播放状态
+                // 播放状态
                 self.play_state = PlayState::Playing;
             }
         } else {
