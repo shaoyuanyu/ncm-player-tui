@@ -296,6 +296,30 @@ impl<'a> Controller for MainScreen<'a> {
                     }
                 }
             }
+            Command::SearchForward(keywords) => {
+                if let Some(selected) = self.playlist_table_state.selected() {
+                    if let Some(next_index) = PLAYER
+                        .lock()
+                        .await
+                        .search_forward_playlist(selected, keywords)
+                    {
+                        self.playlist_table_state.select(Some(next_index));
+                        self.current_focus_panel = FocusPanel::PlaylistInside;
+                    }
+                }
+            }
+            Command::SearchBackward(keywords) => {
+                if let Some(selected) = self.playlist_table_state.selected() {
+                    if let Some(next_index) = PLAYER
+                        .lock()
+                        .await
+                        .search_backward_playlist(selected, keywords)
+                    {
+                        self.playlist_table_state.select(Some(next_index));
+                        self.current_focus_panel = FocusPanel::PlaylistInside;
+                    }
+                }
+            }
             _ => {
                 return Ok(false);
             }

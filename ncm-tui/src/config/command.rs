@@ -3,6 +3,7 @@ use crate::config::ScreenEnum;
 use anyhow::{anyhow, Result};
 use ncm_play::PlayMode;
 
+#[derive(Clone)]
 pub enum Command {
     Quit,
     GotoScreen(ScreenEnum),
@@ -14,6 +15,8 @@ pub enum Command {
     StartPlay,
     NextSong,
     PrevSong,
+    SearchForward(Vec<String>),
+    SearchBackward(Vec<String>),
     //
     Down,
     Up,
@@ -73,6 +76,20 @@ impl Command {
             },
             Some("top") => Ok(Self::GoToTop),
             Some("bottom") => Ok(Self::GoToBottom),
+            Some("/") => {
+                let mut keywords = Vec::new();
+                while let Some(keyword) = tokens.next() {
+                    keywords.push(keyword.to_string());
+                }
+                Ok(Self::SearchForward(keywords))
+            }
+            Some("?") => {
+                let mut keywords = Vec::new();
+                while let Some(keyword) = tokens.next() {
+                    keywords.push(keyword.to_string());
+                }
+                Ok(Self::SearchBackward(keywords))
+            }
             Some(other) => Err(anyhow!("Invalid command: {}", other)),
             None => Ok(Self::Nop),
         }

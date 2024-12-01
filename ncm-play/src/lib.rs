@@ -22,6 +22,7 @@ pub enum PlayState {
     Ended,
 }
 
+#[derive(Clone)]
 pub enum PlayMode {
     Single,
     SingleRepeat,
@@ -154,7 +155,76 @@ impl Player {
     }
 }
 
+/// playlist 搜索
+impl Player {
+    /// 向后搜索歌单（向上方搜索）
+    pub fn search_backward_playlist(
+        &mut self,
+        start_index: usize,
+        keywords: Vec<String>,
+    ) -> Option<usize> {
+        if start_index < self.current_playlist.len() {
+            let playlist_backward_iter = (&self.current_playlist[0..start_index])
+                .iter()
+                .enumerate()
+                .rev();
+
+            if let Some(offset) = self.search_in_iter(playlist_backward_iter, keywords) {
+                return Some(offset);
+            }
+        }
+
+        None
+    }
+
+    /// 向前搜索歌单（向下方搜索）
+    pub fn search_forward_playlist(
+        &mut self,
+        start_index: usize,
+        keywords: Vec<String>,
+    ) -> Option<usize> {
+        if start_index + 1 < self.current_playlist.len() {
+            let playlist_backward_iter = (&self.current_playlist[start_index + 1..])
+                .iter()
+                .enumerate();
+
+            if let Some(offset) = self.search_in_iter(playlist_backward_iter, keywords) {
+                return Some(start_index + 1 + offset);
+            }
+        }
+
+        None
+    }
+
+    #[inline]
+    fn search_in_iter<'a, I>(&self, mut playlist_iter: I, keywords: Vec<String>) -> Option<usize>
+    where
+        I: Iterator<Item = (usize, &'a SongInfo)>,
+    {
+        while let Some((index, song_info)) = playlist_iter.next() {
+            let mut key_matched = true;
+            for keyword in keywords.iter() {
+                if !song_info
+                    .name
+                    .clone()
+                    .to_ascii_lowercase()
+                    .contains(keyword.to_ascii_lowercase().as_str())
+                {
+                    key_matched = false;
+                    break;
+                }
+            }
+            if key_matched {
+                return Some(index);
+            }
+        }
+
+        None
+    }
+}
+
 /// public
+/// 播放相关
 impl Player {
     /// 切换播放/暂停
     pub fn play_or_pause(&mut self) {
@@ -349,8 +419,8 @@ impl Player {
 
     fn play_new_song_by_uri(&mut self, uri: &str) {
         self.play.stop();
-        self.play.set_volume(self.volume);
         self.play.set_uri(Some(uri));
+        self.play.set_volume(self.volume);
         self.play.play();
     }
 

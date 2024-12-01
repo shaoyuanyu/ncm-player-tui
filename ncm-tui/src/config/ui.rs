@@ -2,7 +2,8 @@ use serde::{Deserialize, Serialize};
 
 pub enum AppMode {
     Normal,
-    CommandEntry,
+    CommandLine,
+    Search(Vec<String>),
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Copy)]

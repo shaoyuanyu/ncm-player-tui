@@ -138,19 +138,54 @@ impl<'a> App<'a> {
         if let Event::Key(key_event) = event::read()? {
             if key_event.kind == KeyEventKind::Press || key_event.kind == KeyEventKind::Repeat {
                 match (&self.current_mode, key_event.code) {
-                    // Normal 模式下按键
+                    // Normal 模式
                     (AppMode::Normal, _) => self.get_command_from_key(key_event.code),
 
-                    // CommandEntry 模式下
-                    (AppMode::CommandEntry, KeyCode::Enter) => {
-                        self.parse_command();
-                        self.back_to_normal_mode();
+                    // Search 模式
+                    // 响应 n / N / esc / enter
+                    (AppMode::Search(search_keywords), KeyCode::Char('n')) => {
+                        self.command_queue
+                            .push_back(Command::SearchForward(search_keywords.clone()));
                     }
-                    (AppMode::CommandEntry, KeyCode::Esc) => {
+                    (AppMode::Search(search_keywords), KeyCode::Char('N')) => {
+                        self.command_queue
+                            .push_back(Command::SearchBackward(search_keywords.clone()));
+                    }
+                    (AppMode::Search(_), KeyCode::Esc) => {
                         self.command_line.reset();
                         self.back_to_normal_mode();
                     }
-                    (AppMode::CommandEntry, _) => {
+                    (AppMode::Search(_), KeyCode::Enter | KeyCode::Char(':')) => {
+                        // 返回 normal 模式，同时解析对应的命令，后续执行
+                        self.command_line.reset();
+                        self.back_to_normal_mode();
+                        self.get_command_from_key(key_event.code);
+                    }
+                    (
+                        AppMode::Search(_),
+                        KeyCode::Up | KeyCode::Char('k') | KeyCode::Down | KeyCode::Char('j'),
+                    ) => {
+                        // 不返回 normal 模式，同时解析对应的命令，后续执行
+                        self.get_command_from_key(key_event.code);
+                    }
+                    (AppMode::Search(_), _) => {}
+
+                    // CommandLine 模式
+                    (AppMode::CommandLine, KeyCode::Enter) => {
+                        self.parse_command();
+                        self.back_to_normal_mode();
+                    }
+                    (AppMode::CommandLine, KeyCode::Esc) => {
+                        self.command_line.reset();
+                        self.back_to_normal_mode();
+                    }
+                    (AppMode::CommandLine, KeyCode::Backspace) => {
+                        if self.command_line.textarea.lines()[0] == "" {
+                            self.command_line.reset();
+                            self.back_to_normal_mode();
+                        }
+                    }
+                    (AppMode::CommandLine, _) => {
                         self.command_line.textarea.input(key_event);
                     }
                 }
@@ -159,7 +194,8 @@ impl<'a> App<'a> {
 
         // 执行命令
         if let Some(cmd) = self.command_queue.pop_front() {
-            match cmd {
+            // app响应的事件
+            match cmd.clone() {
                 Command::Quit => {
                     return Ok(false);
                 }
@@ -167,9 +203,7 @@ impl<'a> App<'a> {
                     self.switch_screen(to_screen).await;
                 }
                 Command::EnterCommand => {
-                    self.switch_to_command_entry_mode();
-                    self.command_line.reset();
-                    self.command_line.set_prompt(":");
+                    self.switch_to_command_line_mode();
                 }
                 Command::Logout => {
                     self.login_screen = LoginScreen::new(&self.normal_style);
@@ -204,7 +238,17 @@ impl<'a> App<'a> {
                         .play_prev_song_now(NCM_API.lock().await)
                         .await?;
                 }
-                // 需要向下传递的事件
+                Command::SearchForward(search_keywords) => {
+                    self.switch_to_search_mode(search_keywords);
+                }
+                Command::SearchBackward(search_keywords) => {
+                    self.switch_to_search_mode(search_keywords);
+                }
+                _ => {}
+            }
+
+            // 需要向下传递的事件
+            match cmd {
                 Command::Down
                 | Command::Up
                 | Command::NextPanel
@@ -213,7 +257,9 @@ impl<'a> App<'a> {
                 | Command::Play
                 | Command::WhereIsThisSong
                 | Command::GoToTop
-                | Command::GoToBottom => {
+                | Command::GoToBottom
+                | Command::SearchForward(_)
+                | Command::SearchBackward(_) => {
                     // 先 update_model(), 再 handle_event()
                     // 取或值
                     // 若写成 self.need_re_update_view = self.need_re_update_view || match ... {} ，match块内的方法可能不被执行
@@ -247,8 +293,8 @@ impl<'a> App<'a> {
 
         // command_line
         let show_cursor = match self.current_mode {
-            AppMode::Normal => false,
-            AppMode::CommandEntry => true,
+            AppMode::CommandLine => true,
+            _ => false,
         };
         self.command_line.set_cursor_visibility(show_cursor);
         self.command_line.update_view(&self.normal_style);
@@ -318,6 +364,18 @@ impl<'a> App<'a> {
             KeyCode::Char(',') => Command::PrevSong,
             KeyCode::Char(':') => Command::EnterCommand,
             KeyCode::Char('q') => Command::Quit,
+            KeyCode::Char('/') => {
+                self.command_line.reset();
+                self.command_line.textarea.insert_str("/ ");
+                self.current_mode = AppMode::CommandLine;
+                Command::Nop
+            }
+            KeyCode::Char('?') => {
+                self.command_line.reset();
+                self.command_line.textarea.insert_str("? ");
+                self.current_mode = AppMode::CommandLine;
+                Command::Nop
+            }
             //
             KeyCode::Tab => Command::NextPanel,
             KeyCode::BackTab => Command::PrevPanel,
@@ -346,8 +404,14 @@ impl<'a> App<'a> {
         self.current_mode = AppMode::Normal;
     }
 
-    fn switch_to_command_entry_mode(&mut self) {
-        self.current_mode = AppMode::CommandEntry;
+    fn switch_to_command_line_mode(&mut self) {
+        self.current_mode = AppMode::CommandLine;
+        self.command_line.reset();
+        self.command_line.set_prompt(":");
+    }
+
+    fn switch_to_search_mode(&mut self, search_keywords: Vec<String>) {
+        self.current_mode = AppMode::Search(search_keywords);
     }
 
     fn show_prompt(&mut self, text: &str) {
