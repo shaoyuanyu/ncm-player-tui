@@ -426,10 +426,27 @@ impl<'a> App<'a> {
     }
 
     async fn switch_screen(&mut self, to_screen: ScreenEnum) {
-        if to_screen == ScreenEnum::Login && NCM_API.lock().await.is_login() {
-            self.command_line
-                .set_content("you have to logout from current account first!");
+        let ncm_api_guard = NCM_API.lock().await;
+        if to_screen == ScreenEnum::Login && ncm_api_guard.is_login() {
+            if let Some(login_info) = ncm_api_guard.login_info() {
+                self.command_line.set_content(
+                    format!(
+                        "正在使用`{}`账号，请先使用`logout`命令登出当前账号",
+                        login_info.nickname
+                    )
+                    .as_str(),
+                );
+            } else {
+                self.command_line
+                    .set_content("请先使用`logout`命令登出当前账号");
+            }
+
             return;
+        }
+        drop(ncm_api_guard);
+
+        if to_screen == ScreenEnum::Main {
+            self.command_line.set_content("按0或F1键查看help页面");
         }
 
         self.need_re_update_view = true;

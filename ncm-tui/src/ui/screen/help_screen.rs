@@ -29,7 +29,19 @@ impl<'a> HelpScreen<'a> {
             Search Forward:                         {}\n\
             Search Backward:                        {}\n\
             Quit:                                   {}",
-            "↑ / k", "↓ / j", "\u{2423} (Space)", "←", "→", "1", "0 / F1", ">", "<", ":", "/", "?", "q",
+            "↑ / k",
+            "↓ / j",
+            "\u{2423} (Space)",
+            "←",
+            "→",
+            "1",
+            "0 / F1",
+            ">",
+            "<",
+            ":",
+            "/",
+            "?",
+            "q",
         ));
         let normal_mode_help_page = Paragraph::new(normal_mode_help_text)
             .block(Block::default().title("普通模式").borders(Borders::ALL))
