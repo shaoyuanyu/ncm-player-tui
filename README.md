@@ -14,9 +14,9 @@ tui 界面基于 `ratatui` crate 开发。
 
 ## 依赖
 
-[Gstreamer](https://gstreamer.freedesktop.org/download)
+### [OpenSSL](https://github.com/openssl/openssl)
 
-[OpenSSL](https://github.com/openssl/openssl)
+### [Gstreamer](https://gstreamer.freedesktop.org/download)
 
 ## Features 列表
 
