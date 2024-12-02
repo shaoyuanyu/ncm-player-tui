@@ -342,27 +342,28 @@ impl<'a> App<'a> {
     fn get_command_from_key(&mut self, key_code: KeyCode) {
         let cmd = match key_code {
             KeyCode::Down => Command::Down,
-            KeyCode::Up => Command::Up,
             KeyCode::Char('j') => Command::Down,
+            KeyCode::Up => Command::Up,
             KeyCode::Char('k') => Command::Up,
             KeyCode::Char(' ') => Command::PlayOrPause,
             KeyCode::Enter => Command::Play,
             KeyCode::Esc => Command::Esc,
             KeyCode::Right => Command::NextPanel,
+            KeyCode::Char('l') => Command::NextPanel,
             KeyCode::Left => Command::PrevPanel,
+            KeyCode::Char('h') => Command::PrevPanel,
             KeyCode::Char('1') => Command::GotoScreen(ScreenEnum::Main),
             KeyCode::Char('0') => Command::GotoScreen(ScreenEnum::Help),
             KeyCode::F(1) => Command::GotoScreen(ScreenEnum::Help),
-            KeyCode::Char('.') => Command::NextSong,
-            KeyCode::Char(',') => Command::PrevSong,
-            KeyCode::Char(':') => Command::EnterCommand,
-            KeyCode::Char('q') => Command::Quit,
+            KeyCode::Char('.') | KeyCode::Char('。') => Command::NextSong,
+            KeyCode::Char(',') | KeyCode::Char('，') => Command::PrevSong,
+            KeyCode::Char(':') | KeyCode::Char('：') => Command::EnterCommand,
             KeyCode::Char('/') => {
                 self.switch_to_search_input_mode();
                 self.command_line.set_content("/ ");
                 Command::Nop
             }
-            KeyCode::Char('?') => {
+            KeyCode::Char('?') | KeyCode::Char('？') => {
                 self.switch_to_search_input_mode();
                 self.command_line.set_content("? ");
                 Command::Nop
@@ -370,6 +371,7 @@ impl<'a> App<'a> {
             //
             KeyCode::Tab => Command::NextPanel,
             KeyCode::BackTab => Command::PrevPanel,
+            KeyCode::Char('q') => Command::Quit,
             _ => Command::Nop,
         };
 
