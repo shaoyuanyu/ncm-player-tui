@@ -407,7 +407,7 @@ impl Player {
             }
             PlayMode::Shuffle => {
                 if let Some(mut index) = self.current_song_index {
-                    index = thread_rng().gen_range(0..=self.current_playlist.len());
+                    index = thread_rng().gen_range(0..self.current_playlist.len());
                     self.current_song_index = Some(index);
                     Some(self.current_playlist[index].clone())
                 } else {
