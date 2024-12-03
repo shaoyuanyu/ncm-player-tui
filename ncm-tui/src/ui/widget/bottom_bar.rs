@@ -64,8 +64,11 @@ impl<'a> Controller for BottomBar<'a> {
         if let (Some(player_position), Some(player_duration)) =
             (player_guard.position(), player_guard.duration())
         {
-            self.playback_ratio =
-                player_position.mseconds() as f64 / player_duration.mseconds() as f64;
+            self.playback_ratio = if player_position.mseconds() as f64 / player_duration.mseconds() as f64 <= 1.0 {
+                player_position.mseconds() as f64 / player_duration.mseconds() as f64
+            } else {
+                1.0
+            };
             self.playback_label = format!(
                 "{:02}:{:02}/{:02}:{:02}",
                 player_position.minutes(),

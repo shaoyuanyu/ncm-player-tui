@@ -96,7 +96,12 @@ impl Player {
 
 /// setter & getter
 impl Player {
-    pub fn set_volume(&mut self, volume: f64) {
+    pub fn set_volume(&mut self, mut volume: f64) {
+        if volume > 1.0 {
+            volume = 1.0;
+        } else if volume < 0.0 {
+            volume = 0.0;
+        }
         self.volume = volume;
         self.play.set_volume(volume);
     }
