@@ -9,6 +9,7 @@
 ```shell
 cargo build --release
 mkdir -p ./target/package/src ./target/package/output
+rm ./target/package/src/ncm-tui-player
 ln ./target/release/ncm-tui ./target/package/src/ncm-tui-player
 export NCM_TUI_PLAYER_VERSION="1.0.0"
 ```
