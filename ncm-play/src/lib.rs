@@ -467,6 +467,8 @@ impl Player {
     ) -> Result<()> {
         if let Some(current_song_info) = self.current_song_info.clone() {
             if let Ok(lyric_with_timestamp) = ncm_api_guard.song_lyric(current_song_info).await {
+                // debug!("get lyric: {:?}", lyric_with_timestamp);
+
                 // 获取歌词和时间戳（在 ncm-api 中已编码过）
                 let mut lyrics: Vec<(String, Option<String>)> = Vec::new();
                 let mut timestamps: Vec<u64> = Vec::new();
@@ -484,6 +486,7 @@ impl Player {
         }
 
         // 无歌词（纯音乐或网络异常）
+        // debug!("failed to get lyric");
         self.current_song_lyrics = None;
         self.current_song_lyric_timestamps = None;
         self.current_song_lyric_index = None;
@@ -497,7 +500,8 @@ impl Player {
             self.current_song_lyric_timestamps.clone(),
         ) {
             if let Some(current_position) = self.position() {
-                if current_song_lyric_index < current_song_lyric_timestamps.len() - 1 {
+                debug!("index: {}, len: {}", current_song_lyric_index, current_song_lyric_timestamps.len());
+                if current_song_lyric_index + 1 < current_song_lyric_timestamps.len() {
                     let next_timestamp =
                         current_song_lyric_timestamps[current_song_lyric_index + 1];
 

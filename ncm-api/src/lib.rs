@@ -339,33 +339,50 @@ impl NcmApi {
         let timestamp_re = Regex::new(r"\[\d+:\d+.\d+]")?;
         // 修正不正常的时间戳 [00:11:22]
         let re_abnormal_ts = Regex::new(r"^\[(\d+):(\d+):(\d+)]")?;
+        // 补全7位时间戳
+        let re_7bit_timestamp = Regex::new(r"\[(\d+):(\d+)]")?;
 
         if !lyric_path.exists() {
             // 创建歌词文件，访问网易云接口获取
             if let Ok(lyric_origin) = self.get_song_lyric(si.id).await {
                 trace!("歌词: {:?}", lyric_origin);
 
-                // 编码
-                let lyrics_with_timestamp = self.encode_lyric(&timestamp_re, &lyric_origin);
+                let lyric_fixed = Lyrics {
+                    lyric: lyric_origin.lyric
+                        .into_iter()
+                        .map(|x| {
+                            let mut fixed = re_abnormal_ts.replace_all(&x, "[$1:$2.$3]").to_string();
+                            fixed = re_7bit_timestamp.replace_all(&fixed, "[$1:$2.000]").to_string();
+                            fixed
+                        })
+                        .collect(),
+                    tlyric: lyric_origin.tlyric
+                        .into_iter()
+                        .map(|x| {
+                            let mut fixed = re_abnormal_ts.replace_all(&x, "[$1:$2.$3]").to_string();
+                            fixed = re_7bit_timestamp.replace_all(&fixed, "[$1:$2.000]").to_string();
+                            fixed
+                        })
+                        .collect(),
+                };
 
-                // 保存歌词文件
-                let lyric = lyric_origin
+                // 修正并保存歌词文件
+                let lyric = lyric_fixed
                     .lyric
-                    .into_iter()
-                    .map(|x| re_abnormal_ts.replace_all(&x, "[$1:$2.$3]").to_string())
-                    .collect::<Vec<String>>()
+                    .clone()
                     .join("\n");
                 fs::write(&lyric_path, lyric)?;
-                if !lyric_origin.tlyric.is_empty() {
+                if !lyric_fixed.tlyric.is_empty() {
                     // 保存翻译歌词文件
-                    let tlyric = lyric_origin
+                    let tlyric = lyric_fixed
                         .tlyric
-                        .into_iter()
-                        .map(|x| re_abnormal_ts.replace_all(&x, "[$1:$2.$3]").to_string())
-                        .collect::<Vec<String>>()
+                        .clone()
                         .join("\n");
                     fs::write(&translation_lyric_path, tlyric)?;
                 }
+
+                // 编码
+                let lyrics_with_timestamp = self.encode_lyric(&timestamp_re, &lyric_fixed);
 
                 // 组织歌词+翻译
                 Ok(lyrics_with_timestamp)
@@ -394,6 +411,7 @@ impl NcmApi {
 
             // 编码歌词和翻译
             let lyrics = Lyrics { lyric, tlyric };
+            trace!("read lyric: {:?}", lyrics);
             let lyrics_with_stamp = self.encode_lyric(&timestamp_re, &lyrics);
 
             // 组织歌词+翻译
