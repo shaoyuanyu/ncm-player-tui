@@ -3,7 +3,7 @@ use crate::ui::widget::{BottomBar, CommandLine};
 use crate::{
     config::{AppMode, Command, ScreenEnum},
     ui::{screen::*, Controller},
-    NCM_API, PLAYER,
+    NCM_CLIENT, PLAYER,
 };
 use anyhow::Result;
 use crossterm::{
@@ -12,6 +12,7 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, LeaveAlternateScreen},
 };
+use log::debug;
 use ratatui::prelude::*;
 use ratatui::style::palette::tailwind;
 use ratatui::widgets::Paragraph;
@@ -89,13 +90,19 @@ impl<'a> App<'a> {
 
     /// cookie 登录/二维码登录后均调用
     pub async fn init_after_login(&mut self) -> Result<()> {
-        if let (Some(playlist_name), Some(playlist)) = NCM_API.lock().await.user_favorite_songlist()
-        {
-            PLAYER
-                .lock()
-                .await
-                .switch_playlist(playlist_name.clone(), playlist.clone());
+        // TODO: 改在 ncm-play 中初始化用户的所有歌单
+        let ncm_client_guard = NCM_CLIENT.lock().await;
+        if let Ok(mut songlists) = ncm_client_guard.get_user_all_songlists().await {
+            if let Some(songlist) = songlists.get_mut(0) {
+                debug!("{:?}", songlist);
+                ncm_client_guard.load_songlist_songs(songlist).await?;
+                PLAYER
+                    .lock()
+                    .await
+                    .switch_playlist(songlist.name.clone(), songlist.songs.to_owned());
+            }
         }
+        drop(ncm_client_guard);
 
         self.switch_screen(ScreenEnum::Main).await;
 
@@ -205,7 +212,7 @@ impl<'a> App<'a> {
                 Command::Logout => {
                     self.login_screen = LoginScreen::new(&self.normal_style);
                     // TODO: 清除 cache
-                    NCM_API.lock().await.logout().await;
+                    NCM_CLIENT.lock().await.logout().await?;
                 }
                 Command::PlayOrPause => {
                     PLAYER.lock().await.play_or_pause();
@@ -217,7 +224,12 @@ impl<'a> App<'a> {
                     PLAYER.lock().await.set_play_mode(play_mode);
                 }
                 Command::StartPlay => {
-                    if let Err(e) = PLAYER.lock().await.start_play(NCM_API.lock().await).await {
+                    if let Err(e) = PLAYER
+                        .lock()
+                        .await
+                        .start_play(NCM_CLIENT.lock().await)
+                        .await
+                    {
                         // self.show_prompt(e.to_string().as_str());
                         self.command_line.set_content(e.to_string().as_str());
                     }
@@ -226,14 +238,14 @@ impl<'a> App<'a> {
                     PLAYER
                         .lock()
                         .await
-                        .play_next_song_now(NCM_API.lock().await)
+                        .play_next_song_now(NCM_CLIENT.lock().await)
                         .await?;
                 }
                 Command::PrevSong => {
                     PLAYER
                         .lock()
                         .await
-                        .play_prev_song_now(NCM_API.lock().await)
+                        .play_prev_song_now(NCM_CLIENT.lock().await)
                         .await?;
                 }
                 Command::SearchForward(search_keywords) => {
@@ -418,7 +430,7 @@ impl<'a> App<'a> {
         //
         let need_redraw = self.login_screen.update_model().await?;
 
-        if NCM_API.lock().await.is_login() {
+        if NCM_CLIENT.lock().await.is_login() {
             // 登录成功
             self.init_after_login().await?;
             Ok(true)
@@ -428,13 +440,13 @@ impl<'a> App<'a> {
     }
 
     async fn switch_screen(&mut self, to_screen: ScreenEnum) {
-        let ncm_api_guard = NCM_API.lock().await;
-        if to_screen == ScreenEnum::Login && ncm_api_guard.is_login() {
-            if let Some(login_info) = ncm_api_guard.login_info() {
+        let ncm_client_guard = NCM_CLIENT.lock().await;
+        if to_screen == ScreenEnum::Login && ncm_client_guard.is_login() {
+            if let Some(login_account) = ncm_client_guard.login_account() {
                 self.command_line.set_content(
                     format!(
                         "正在使用`{}`账号，请先使用`logout`命令登出当前账号",
-                        login_info.nickname
+                        login_account.nickname
                     )
                     .as_str(),
                 );
@@ -445,7 +457,7 @@ impl<'a> App<'a> {
 
             return;
         }
-        drop(ncm_api_guard);
+        drop(ncm_client_guard);
 
         if to_screen == ScreenEnum::Main {
             self.command_line.set_content("按0或F1键查看help页面");

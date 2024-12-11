@@ -1,8 +1,9 @@
 use std::fs;
 use std::path::PathBuf;
 
-const APP_NAME: &str = "ncm-tui";
+const APP_NAME: &str = "ncm-tui-player";
 
+#[allow(unused)]
 pub struct Path {
     // 一级目录
     pub data: PathBuf,
@@ -10,6 +11,7 @@ pub struct Path {
     pub cache: PathBuf,
 
     // 二级目录
+    pub api_program: PathBuf,
     pub login_cookie: PathBuf,
     pub lyrics: PathBuf,
 }
@@ -31,9 +33,11 @@ impl Path {
             fs::create_dir(&cache).expect("Couldn't create cache dir.");
         }
 
-        let login_cookie = data.clone().join("cookies.json");
+        let api_program = data.clone().join("neteasecloudmusicapi");
 
-        let lyrics = data.clone().join("lyrics");
+        let login_cookie = data.clone().join("cookies");
+
+        let lyrics = cache.clone().join("lyrics");
         if !lyrics.exists() {
             fs::create_dir(&lyrics).expect("Couldn't create lyrics dir.");
         }
@@ -42,6 +46,7 @@ impl Path {
             data,
             config,
             cache,
+            api_program,
             login_cookie,
             lyrics,
         }

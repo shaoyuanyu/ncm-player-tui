@@ -14,9 +14,54 @@ tui 界面基于 `ratatui` crate 开发。
 
 ## 依赖
 
-### [OpenSSL](https://github.com/openssl/openssl)
+### [nodejs 14+](https://nodejs.org/)
+
+### [netease-cloud-music-api](./bin/neteasecloudmusicapi.zip)
 
 ### [Gstreamer](https://gstreamer.freedesktop.org/download)
+
+## 安装依赖
+
+### 1. 自行准备 nodejs 和 npm 环境
+
+nodejs 版本 >= 14
+
+### 2. 解压 netease-cloud-music-api
+
+请将项目 `bin` 目录下的 `neteasecloudmusicapi.zip` 解压到对应操作系统的指定路径:
+
+|   OS    |                            解压到                             |
+|:-------:|:----------------------------------------------------------:|
+|  Linux  |         /home/`$USER`/.local/share/ncm-tui-player/         |
+|  MacOS  | /Users/`$USER`/Library/Application Support/ncm-tui-player/ |
+| Windows |   C:\\Users\\`$USER`\\AppData\\Roaming\\ncm-tui-player\\   |
+
+解压后的文件树如下：
+
+```
+ncm-tui-player
+└── neteasecloudmusicapi
+    ├── app.js
+    ├── CHANGELOG.MD
+    ├── data
+    ├── ...
+    └── yarn.lock
+```
+
+### 3. 安装 netease-cloud-music-api
+
+切换到步骤 `2.` 中的目录，执行
+
+```shell
+cd neteasecloudmusicapi
+npm install
+```
+
+### 4. 安装 Gstreamer
+
+理论上本项目只需要 gstreamer 和 gstreamer-base 组件。
+
+各平台下的安装手册有待补充，可以参考[官方文档](https://gstreamer.freedesktop.org/documentation/installing/index.html?gi-language=c)自行安装。
 
 ## Features 列表
 

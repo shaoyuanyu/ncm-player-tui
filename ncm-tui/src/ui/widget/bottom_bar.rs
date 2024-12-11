@@ -64,11 +64,12 @@ impl<'a> Controller for BottomBar<'a> {
         if let (Some(player_position), Some(player_duration)) =
             (player_guard.position(), player_guard.duration())
         {
-            self.playback_ratio = if player_position.mseconds() as f64 / player_duration.mseconds() as f64 <= 1.0 {
-                player_position.mseconds() as f64 / player_duration.mseconds() as f64
-            } else {
-                1.0
-            };
+            self.playback_ratio =
+                if player_position.mseconds() as f64 / player_duration.mseconds() as f64 <= 1.0 {
+                    player_position.mseconds() as f64 / player_duration.mseconds() as f64
+                } else {
+                    1.0
+                };
             self.playback_label = format!(
                 "{:02}:{:02}/{:02}:{:02}",
                 player_position.minutes(),
@@ -80,7 +81,7 @@ impl<'a> Controller for BottomBar<'a> {
             self.playback_ratio = 0.0;
             self.playback_label = String::from("--:--/--:--");
         };
-        if let Some(song_info) = player_guard.current_song_info_ref().clone() {
+        if let Some(song_info) = player_guard.current_song().clone() {
             self.song_name = Some(song_info.name.clone());
             self.singer_name = Some(song_info.singer.clone());
         }

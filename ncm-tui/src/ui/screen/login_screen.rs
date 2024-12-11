@@ -1,6 +1,6 @@
 use crate::config::Command;
 use crate::ui::Controller;
-use crate::NCM_API;
+use crate::NCM_CLIENT;
 use anyhow::Result;
 use fast_qr::QRBuilder;
 use ratatui::{
@@ -38,9 +38,7 @@ impl<'a> LoginScreen<'a> {
     }
 
     async fn create_login_qr(&mut self) -> Result<()> {
-        let ncm_api_guard = NCM_API.lock().await;
-        let (qr_url, qr_unikey) = ncm_api_guard.login_qr_create().await?;
-        drop(ncm_api_guard);
+        let (qr_url, qr_unikey) = NCM_CLIENT.lock().await.get_login_qr().await?;
 
         self.login_url = qr_url;
         self.login_unikey = qr_unikey;
@@ -57,14 +55,14 @@ impl<'a> Controller for LoginScreen<'a> {
             return Ok(true);
         }
 
-        let mut ncm_api_guard = NCM_API.lock().await;
+        let mut ncm_client_guard = NCM_CLIENT.lock().await;
 
         // 检查二维码状态并更新
-        let msg = ncm_api_guard
-            .login_qr_check(self.login_unikey.clone())
+        let qr_status_code = ncm_client_guard
+            .check_login_qr(self.login_unikey.as_str())
             .await?;
 
-        self.login_qrcode_status = match msg.code {
+        self.login_qrcode_status = match qr_status_code {
             800 => String::from("二维码已过期"),
             801 => String::from("等待扫码"),
             802 => String::from("等待确认"),
@@ -72,11 +70,11 @@ impl<'a> Controller for LoginScreen<'a> {
             _ => String::from(""),
         };
 
-        if msg.code == 800 {
+        if qr_status_code == 800 {
             self.create_login_qr().await?;
         }
-        if msg.code == 803 {
-            ncm_api_guard.init_after_new_login().await?;
+        if qr_status_code == 803 {
+            ncm_client_guard.check_login_status().await?;
         }
 
         Ok(true)

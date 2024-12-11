@@ -1,8 +1,8 @@
 use crate::config::Command;
 use crate::ui::Controller;
-use crate::{NCM_API, PLAYER};
+use crate::{NCM_CLIENT, PLAYER};
 use anyhow::Result;
-use ncm_api::SongInfo;
+use ncm_client::model::Song;
 use ratatui::layout::Rect;
 use ratatui::prelude::*;
 use ratatui::style::palette::tailwind;
@@ -35,7 +35,7 @@ pub struct MainScreen<'a> {
     playlist_table_rows: Vec<Row<'a>>,
     playlist_table_state: TableState,
     //
-    song_info: Option<SongInfo>,
+    song: Option<Song>,
     song_lyric_list_items: Vec<ListItem<'a>>,
     song_lyric_list_state: ListState,
 
@@ -56,7 +56,7 @@ impl<'a> MainScreen<'a> {
             playlist_name: String::new(),
             playlist_table_rows: Vec::new(),
             playlist_table_state: TableState::new(),
-            song_info: None,
+            song: None,
             song_lyric_list_items,
             song_lyric_list_state: ListState::default(),
             playlist_table: Table::default(),
@@ -72,22 +72,22 @@ impl<'a> Controller for MainScreen<'a> {
         let player_guard = PLAYER.lock().await;
 
         // playlist
-        if self.playlist_name != *player_guard.current_playlist_name_ref() {
+        if self.playlist_name != *player_guard.current_playlist_name() {
             //
-            self.playlist_name = player_guard.current_playlist_name_ref().clone();
+            self.playlist_name = player_guard.current_playlist_name().clone();
             //
             self.playlist_table_rows = player_guard
                 .current_playlist()
                 .iter()
-                .map(|song_info| {
+                .map(|song| {
                     Row::from_iter(vec![
-                        Cell::new(song_info.name.clone()),
-                        Cell::new(song_info.singer.clone()),
-                        Cell::new(song_info.album.clone()),
+                        Cell::new(song.name.clone()),
+                        Cell::new(song.singer.clone()),
+                        Cell::new(song.album.clone()),
                         Cell::new(format!(
                             "{:02}:{:02}",
-                            song_info.duration.clone() / 60000,
-                            song_info.duration.clone() % 60000 / 1000
+                            song.duration.clone() / 60000,
+                            song.duration.clone() % 60000 / 1000
                         )),
                     ])
                 })
@@ -105,7 +105,7 @@ impl<'a> Controller for MainScreen<'a> {
         }
 
         // song
-        if self.song_info == *player_guard.current_song_info_ref() {
+        if self.song == *player_guard.current_song() {
             // 歌曲仍在播放，当前歌词行需更新；或者无歌曲正在播放
             // current_focus_panel 不为 LyricInside 时，自动更新当前歌词行
             // current_focus_panel 为 LyricInside 时，根据用户选择选中歌词行
@@ -120,23 +120,23 @@ impl<'a> Controller for MainScreen<'a> {
             }
         } else {
             // 切换到新歌
-            self.song_info = player_guard.current_song_info_ref().clone();
+            self.song = player_guard.current_song().clone();
             // 更新歌词 ListItem
             if let Some(lyrics) = player_guard.current_song_lyrics() {
                 // 有歌词
                 self.song_lyric_list_items = lyrics
                     .iter()
-                    .map(|lyric| {
-                        if lyric.1 != None {
-                            // 有翻译
-                            ListItem::new(Text::from(vec![
-                                Line::from(lyric.0.clone()).centered(),
-                                Line::from(lyric.1.clone().unwrap()).centered(),
-                            ]))
-                        } else {
-                            // 无翻译
-                            ListItem::new(Text::from(Line::from(lyric.0.clone()).centered()))
+                    .map(|lyric_line| {
+                        let mut lines: Vec<Line> = Vec::new();
+                        lines.push(Line::from(lyric_line.lyric_line.to_owned()).centered());
+                        if let Some(trans_lyric_line) = lyric_line.trans_lyric_line.as_ref() {
+                            lines.push(Line::from(trans_lyric_line.to_owned()).centered());
                         }
+                        // TODO: 添加罗马音显示设置
+                        // if let Some(roman_lyric_line) = lyric_line.roman_lyric_line.as_ref() {
+                        //     lines.push(Line::from(roman_lyric_line.to_owned()).centered());
+                        // }
+                        ListItem::new(Text::from(lines))
                     })
                     .collect();
             } else {
@@ -245,7 +245,7 @@ impl<'a> Controller for MainScreen<'a> {
                         .await
                         .play_particularly_now(
                             self.playlist_table_state.selected().unwrap_or(0),
-                            NCM_API.lock().await,
+                            NCM_CLIENT.lock().await,
                         )
                         .await?;
                 }
@@ -410,19 +410,12 @@ impl<'a> MainScreen<'a> {
         let mut song_lyric_list = List::new(self.song_lyric_list_items.clone()).style(*style);
 
         // block
-        song_lyric_list = match self.song_info.clone() {
-            Some(current_song_info) => song_lyric_list.block({
+        song_lyric_list = match self.song.clone() {
+            Some(song) => song_lyric_list.block({
                 let mut block = Block::default()
-                    .title(
-                        Line::from(format!("\u{1F3B5}{}", current_song_info.name)).left_aligned(),
-                    )
-                    .title(
-                        Line::from(format!("\u{1F3A4}{}", current_song_info.singer))
-                            .right_aligned(),
-                    )
-                    .title_bottom(
-                        Line::from(format!("\u{1F4DA}{}", current_song_info.album)).centered(),
-                    )
+                    .title(Line::from(format!("\u{1F3B5}{}", song.name)).left_aligned())
+                    .title(Line::from(format!("\u{1F3A4}{}", song.singer)).right_aligned())
+                    .title_bottom(Line::from(format!("\u{1F4DA}{}", song.album)).centered())
                     .borders(Borders::ALL);
                 if self.current_focus_panel == FocusPanel::LyricOutside {
                     block = block.border_style(PANEL_SELECTED_BORDER_STYLE);
@@ -462,7 +455,7 @@ impl<'a> MainScreen<'a> {
     ) {
         if self.song_lyric_list_items.len() > 1 {
             let current_index = lyric_list_state.selected().unwrap_or(0);
-            // 一句歌词所占行数（带翻译的歌词会占2行）
+            // 一句歌词所占行数（带翻译的歌词会占多行）
             let lyric_line_count = self
                 .song_lyric_list_items
                 .get(current_index)
@@ -470,12 +463,11 @@ impl<'a> MainScreen<'a> {
                 .height();
             let half_line_count = available_line_count / lyric_line_count / 2;
             let near_top_line = 0 + half_line_count;
-            let near_bottom_line =
-                if self.song_lyric_list_items.len() - 1 - half_line_count >= half_line_count {
-                    self.song_lyric_list_items.len() - 1 - half_line_count
-                } else {
-                    half_line_count
-                };
+            let near_bottom_line = if self.song_lyric_list_items.len() - 1 >= 2 * half_line_count {
+                self.song_lyric_list_items.len() - 1 - half_line_count
+            } else {
+                half_line_count
+            };
             // 修正 offset
             if current_index >= near_top_line {
                 if current_index >= near_bottom_line {
