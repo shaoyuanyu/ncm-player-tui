@@ -63,6 +63,10 @@ npm install
 
 各平台下的安装手册有待补充，可以参考[官方文档](https://gstreamer.freedesktop.org/documentation/installing/index.html?gi-language=c)自行安装。
 
+## 运行说明
+
+运行时需要将 `stderr` 输出重定向。
+
 ## Features 列表
 
 - [x] 扫码登录
