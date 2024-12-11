@@ -20,7 +20,7 @@ gstreamer-play = "0.23.2"
 lazy_static = "1.5.0"
 log = "0.4.22"
 
-ncm-api = { path = "../ncm-api" }
+ncm-client = { path = "../ncm-client" }
 ncm-play = { path = "../ncm-play" }
 
 ratatui = { version = "0.29.0", features = ["serde"] }

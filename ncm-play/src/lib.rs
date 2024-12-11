@@ -2,7 +2,10 @@ use anyhow::{anyhow, Result};
 use gstreamer::ClockTime;
 use gstreamer_play::{gst, Play, PlayVideoRenderer};
 use log::debug;
-use ncm_api::{NcmApi, SongInfo};
+use ncm_client::{
+    model::{Lyrics, Song},
+    NcmClient,
+};
 use rand::{thread_rng, Rng};
 use std::fmt;
 use tokio::sync::MutexGuard;
@@ -50,13 +53,12 @@ pub struct Player {
     volume: f64,
     //
     current_playlist_name: String,
-    current_playlist: Vec<SongInfo>,
+    current_playlist: Vec<Song>,
     play_index_history_stack: Vec<usize>, // 历史记录，保存播放的歌曲在 playlist 中的 index，栈顶为当前播放
     //
     current_song_index: Option<usize>,
-    current_song_info: Option<SongInfo>,
-    current_song_lyrics: Option<Vec<(String, Option<String>)>>, // 兼容带翻译的歌词
-    current_song_lyric_timestamps: Option<Vec<u64>>,            // 单位: ms
+    current_song: Option<Song>,
+    current_song_lyrics: Option<Lyrics>,
     current_song_lyric_index: Option<usize>,
 }
 
@@ -86,9 +88,8 @@ impl Player {
             current_playlist: Vec::new(),
             play_index_history_stack: Vec::new(),
             current_song_index: None,
-            current_song_info: None,
+            current_song: None,
             current_song_lyrics: None,
-            current_song_lyric_timestamps: None,
             current_song_lyric_index: None,
         }
     }
@@ -135,23 +136,23 @@ impl Player {
         self.play.position()
     }
 
-    pub fn current_playlist_name_ref(&self) -> &String {
+    pub fn current_playlist_name(&self) -> &String {
         &self.current_playlist_name
     }
 
-    pub fn current_playlist(&self) -> Vec<SongInfo> {
+    pub fn current_playlist(&self) -> Vec<Song> {
         self.current_playlist.clone()
     }
 
-    pub fn current_song_info_ref(&self) -> &Option<SongInfo> {
-        &self.current_song_info
+    pub fn current_song(&self) -> &Option<Song> {
+        &self.current_song
     }
 
     pub fn current_song_index(&self) -> Option<usize> {
         self.current_song_index.clone()
     }
 
-    pub fn current_song_lyrics(&self) -> Option<Vec<(String, Option<String>)>> {
+    pub fn current_song_lyrics(&self) -> Option<Lyrics> {
         self.current_song_lyrics.clone()
     }
 
@@ -204,12 +205,12 @@ impl Player {
     #[inline]
     fn search_in_iter<'a, I>(&self, mut playlist_iter: I, keywords: Vec<String>) -> Option<usize>
     where
-        I: Iterator<Item = (usize, &'a SongInfo)>,
+        I: Iterator<Item = (usize, &'a Song)>,
     {
-        while let Some((index, song_info)) = playlist_iter.next() {
+        while let Some((index, song)) = playlist_iter.next() {
             let mut key_matched = true;
             for keyword in keywords.iter() {
-                if !song_info
+                if !song
                     .name
                     .clone()
                     .to_ascii_lowercase()
@@ -243,7 +244,7 @@ impl Player {
     }
 
     /// 切换播放列表
-    pub fn switch_playlist(&mut self, playlist_name: String, playlist: Vec<SongInfo>) {
+    pub fn switch_playlist(&mut self, playlist_name: String, playlist: Vec<Song>) {
         self.current_playlist_name = playlist_name;
         self.current_playlist = playlist;
         self.play_index_history_stack = Vec::new();
@@ -255,7 +256,10 @@ impl Player {
     }
 
     /// 自动播放
-    pub async fn auto_play<'a>(&mut self, ncm_api_guard: MutexGuard<'a, NcmApi>) -> Result<()> {
+    pub async fn auto_play<'a>(
+        &mut self,
+        ncm_client_guard: MutexGuard<'a, NcmClient>,
+    ) -> Result<()> {
         // 判断一首歌是否播放完
         if self.play_state == PlayState::Playing {
             if let (Some(position), Some(duration)) = (self.position(), self.duration()) {
@@ -274,7 +278,7 @@ impl Player {
         } else if self.play_state == PlayState::Ended {
             // 播放下一首
             self.update_next_to_play();
-            self.play_next(ncm_api_guard).await?;
+            self.play_next(ncm_client_guard).await?;
         }
 
         Ok(())
@@ -284,33 +288,36 @@ impl Player {
     pub async fn play_particularly_now<'a>(
         &mut self,
         index_to_play: usize,
-        ncm_api_guard: MutexGuard<'a, NcmApi>,
+        ncm_client_guard: MutexGuard<'a, NcmClient>,
     ) -> Result<()> {
         if index_to_play < self.current_playlist.len() {
             self.play_state = PlayState::Playing;
             self.current_song_index = Some(index_to_play);
-            self.current_song_info = Some(self.current_playlist[index_to_play].clone());
+            self.current_song = Some(self.current_playlist[index_to_play].clone());
 
-            self.play_next(ncm_api_guard).await?;
+            self.play_next(ncm_client_guard).await?;
         }
 
         Ok(())
     }
 
     /// 根据当前模式开始播放
-    pub async fn start_play<'a>(&mut self, ncm_api_guard: MutexGuard<'a, NcmApi>) -> Result<()> {
+    pub async fn start_play<'a>(
+        &mut self,
+        ncm_client_guard: MutexGuard<'a, NcmClient>,
+    ) -> Result<()> {
         match self.play_mode {
             PlayMode::ListRepeat => {
                 self.current_song_index = Some(0);
-                self.current_song_info = Some(self.current_playlist[0].clone());
-                self.play_next(ncm_api_guard).await?;
+                self.current_song = Some(self.current_playlist[0].clone());
+                self.play_next(ncm_client_guard).await?;
                 Ok(())
             }
             PlayMode::Shuffle => {
                 let index = thread_rng().gen_range(0..=self.current_playlist.len());
                 self.current_song_index = Some(index);
-                self.current_song_info = Some(self.current_playlist[index].clone());
-                self.play_next(ncm_api_guard).await?;
+                self.current_song = Some(self.current_playlist[index].clone());
+                self.play_next(ncm_client_guard).await?;
                 Ok(())
             }
             _ => Err(anyhow!("start命令只在`列表循环`和`随机播放`模式下有效")),
@@ -320,7 +327,7 @@ impl Player {
     /// 立刻播放下一首
     pub async fn play_next_song_now<'a>(
         &mut self,
-        ncm_api_guard: MutexGuard<'a, NcmApi>,
+        ncm_client_guard: MutexGuard<'a, NcmClient>,
     ) -> Result<()> {
         if self.play_state == PlayState::Playing
             || self.play_state == PlayState::Paused
@@ -331,12 +338,9 @@ impl Player {
                 if position.mseconds() >= 500 {
                     self.update_next_to_play();
 
-                    debug!(
-                        "[{:?}] {:?}, ",
-                        self.current_song_index, self.current_song_info
-                    );
+                    debug!("[{:?}] {:?}, ", self.current_song_index, self.current_song);
 
-                    self.play_next(ncm_api_guard).await?;
+                    self.play_next(ncm_client_guard).await?;
                 }
             }
         }
@@ -347,7 +351,7 @@ impl Player {
     /// 立刻播放上一首
     pub async fn play_prev_song_now<'a>(
         &mut self,
-        ncm_api_guard: MutexGuard<'a, NcmApi>,
+        ncm_client_guard: MutexGuard<'a, NcmClient>,
     ) -> Result<()> {
         // 当前单曲播放半秒后才可以切换到上一首，留出缓冲时间，防止切换过快
         if let Some(position) = self.position() {
@@ -357,9 +361,8 @@ impl Player {
                     if let Some(prev_song_index) = self.play_index_history_stack.pop() {
                         // 播放上一首
                         self.current_song_index = Some(prev_song_index);
-                        self.current_song_info =
-                            Some(self.current_playlist[prev_song_index].clone());
-                        self.play_next(ncm_api_guard).await?;
+                        self.current_song = Some(self.current_playlist[prev_song_index].clone());
+                        self.play_next(ncm_client_guard).await?;
                     } else {
                         // 无上一首（当前为第一首播放）
                         self.play_index_history_stack.push(current_song_index);
@@ -377,10 +380,10 @@ impl Player {
             || self.play_state == PlayState::Paused
             || self.play_state == PlayState::Ended
         {
-            if let Some(timestamps) = self.current_song_lyric_timestamps.clone() {
-                if index < timestamps.len() {
+            if let Some(current_song_lyrics) = self.current_song_lyrics.as_ref() {
+                if index < current_song_lyrics.len() {
                     self.current_song_lyric_index = Some(index);
-                    let timestamp = timestamps[index];
+                    let timestamp = current_song_lyrics[index].timestamp;
                     self.play.seek(ClockTime::from_mseconds(timestamp));
                 }
             }
@@ -393,11 +396,11 @@ impl Player {
 /// private
 impl Player {
     /// 根据模式更新下一首播放的歌曲
-    /// 更新 self.current_song_info & self.current_song_index
+    /// 更新 self.current_song & self.current_song_index
     fn update_next_to_play(&mut self) {
-        self.current_song_info = match self.play_mode {
+        self.current_song = match self.play_mode {
             PlayMode::Single => None,
-            PlayMode::SingleRepeat => self.current_song_info.clone(),
+            PlayMode::SingleRepeat => self.current_song.clone(),
             PlayMode::ListRepeat => {
                 if let Some(mut index) = self.current_song_index {
                     index += 1;
@@ -430,25 +433,25 @@ impl Player {
     }
 
     /// 播放下一首
-    async fn play_next<'a>(&mut self, ncm_api_guard: MutexGuard<'a, NcmApi>) -> Result<()> {
-        if let Some(mut song_info) = self.current_song_info.clone() {
+    async fn play_next<'a>(&mut self, ncm_client_guard: MutexGuard<'a, NcmClient>) -> Result<()> {
+        if let Some(mut song) = self.current_song.clone() {
             // 获取歌曲 uri
-            if let Ok(url) = ncm_api_guard.get_song_url(song_info.id).await {
-                song_info.song_url = url;
+            ncm_client_guard.load_song_url(&mut song).await?;
 
-                // 更新当前歌曲信息
-                self.current_song_info = Some(song_info.clone());
+            // 更新当前歌曲信息
+            self.current_song = Some(song.clone());
 
+            if let Some(url) = song.song_url {
                 // 入栈播放历史
                 if let Some(index) = self.current_song_index {
                     self.play_index_history_stack.push(index);
                 }
 
                 // 获取歌词
-                self.update_current_lyric_encoded(ncm_api_guard).await?;
+                self.update_current_song_lyrics(ncm_client_guard).await?;
 
                 // 播放
-                self.play_new_song_by_uri(song_info.song_url.as_str());
+                self.play_new_song_by_uri(url.as_str());
 
                 // 播放状态
                 self.play_state = PlayState::Playing;
@@ -461,24 +464,13 @@ impl Player {
         Ok(())
     }
 
-    async fn update_current_lyric_encoded<'a>(
+    async fn update_current_song_lyrics<'a>(
         &mut self,
-        ncm_api_guard: MutexGuard<'a, NcmApi>,
+        ncm_client_guard: MutexGuard<'a, NcmClient>,
     ) -> Result<()> {
-        if let Some(current_song_info) = self.current_song_info.clone() {
-            if let Ok(lyric_with_timestamp) = ncm_api_guard.song_lyric(current_song_info).await {
-                // debug!("get lyric: {:?}", lyric_with_timestamp);
-
-                // 获取歌词和时间戳（在 ncm-api 中已编码过）
-                let mut lyrics: Vec<(String, Option<String>)> = Vec::new();
-                let mut timestamps: Vec<u64> = Vec::new();
-                for (timestamp, lyric) in lyric_with_timestamp {
-                    lyrics.push(lyric);
-                    timestamps.push(timestamp);
-                }
-
+        if let Some(current_song) = self.current_song.as_ref() {
+            if let Ok(lyrics) = ncm_client_guard.get_song_lyrics(current_song.id).await {
                 self.current_song_lyrics = Some(lyrics);
-                self.current_song_lyric_timestamps = Some(timestamps);
                 self.current_song_lyric_index = Some(0);
 
                 return Ok(());
@@ -486,26 +478,22 @@ impl Player {
         }
 
         // 无歌词（纯音乐或网络异常）
-        // debug!("failed to get lyric");
         self.current_song_lyrics = None;
-        self.current_song_lyric_timestamps = None;
         self.current_song_lyric_index = None;
 
         Ok(())
     }
 
     fn auto_lyric_forward(&mut self) {
-        if let (Some(current_song_lyric_index), Some(current_song_lyric_timestamps)) = (
+        if let (Some(current_song_lyric_index), Some(current_song_lyrics)) = (
             self.current_song_lyric_index,
-            self.current_song_lyric_timestamps.clone(),
+            self.current_song_lyrics.as_ref(),
         ) {
             if let Some(current_position) = self.position() {
-                debug!("index: {}, len: {}", current_song_lyric_index, current_song_lyric_timestamps.len());
-                if current_song_lyric_index + 1 < current_song_lyric_timestamps.len() {
+                if current_song_lyric_index + 1 < current_song_lyrics.len() {
                     let next_timestamp =
-                        current_song_lyric_timestamps[current_song_lyric_index + 1];
+                        current_song_lyrics[current_song_lyric_index + 1].timestamp;
 
-                    // 已经到下一句歌词的时间戳
                     if current_position.mseconds() >= next_timestamp {
                         self.current_song_lyric_index = Some(current_song_lyric_index + 1);
                     }
