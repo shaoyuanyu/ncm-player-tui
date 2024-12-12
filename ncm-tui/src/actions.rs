@@ -1,9 +1,9 @@
-use crate::{NCM_CLIENT, PLAYER};
+use crate::{ncm_client, player};
 use anyhow::Result;
 
 pub async fn init_songlists() -> Result<()> {
-    let ncm_client_guard = NCM_CLIENT.lock().await;
-    let mut player_guard = PLAYER.lock().await;
+    let ncm_client_guard = ncm_client.lock().await;
+    let mut player_guard = player.lock().await;
     if let Ok(songlists) = ncm_client_guard.get_user_all_songlists().await {
         let len = songlists.len();
 

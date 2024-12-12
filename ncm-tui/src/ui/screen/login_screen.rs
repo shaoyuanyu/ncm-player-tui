@@ -1,6 +1,6 @@
 use crate::config::Command;
+use crate::ncm_client;
 use crate::ui::Controller;
-use crate::NCM_CLIENT;
 use anyhow::Result;
 use fast_qr::QRBuilder;
 use ratatui::{
@@ -38,7 +38,7 @@ impl<'a> LoginScreen<'a> {
     }
 
     async fn create_login_qr(&mut self) -> Result<()> {
-        let (qr_url, qr_unikey) = NCM_CLIENT.lock().await.get_login_qr().await?;
+        let (qr_url, qr_unikey) = ncm_client.lock().await.get_login_qr().await?;
 
         self.login_url = qr_url;
         self.login_unikey = qr_unikey;
@@ -55,7 +55,7 @@ impl<'a> Controller for LoginScreen<'a> {
             return Ok(true);
         }
 
-        let mut ncm_client_guard = NCM_CLIENT.lock().await;
+        let mut ncm_client_guard = ncm_client.lock().await;
 
         // 检查二维码状态并更新
         let qr_status_code = ncm_client_guard

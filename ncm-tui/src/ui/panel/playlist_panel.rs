@@ -1,7 +1,8 @@
 use crate::config::Command;
 use crate::ui::panel::{PanelFocusedStatus, ITEM_SELECTED_STYLE, PANEL_SELECTED_BORDER_STYLE};
 use crate::ui::Controller;
-use crate::{NCM_CLIENT, PLAYER};
+use crate::{ncm_client, player};
+use ncm_api::model::Song;
 use ratatui::layout::{Constraint, Rect};
 use ratatui::prelude::{Style, Text};
 use ratatui::style::palette::tailwind;
@@ -32,38 +33,50 @@ impl<'a> PlaylistPanel<'a> {
     }
 }
 
-impl<'a> Controller for PlaylistPanel<'a> {
-    async fn update_model(&mut self) -> anyhow::Result<bool> {
-        let mut result = Ok(false);
-        let player_guard = PLAYER.lock().await;
-
+impl<'a> PlaylistPanel<'a> {
+    /// 根据当前播放列表更新 model
+    async fn update_model_by_current_playlist(&mut self) -> anyhow::Result<()> {
+        let player_guard = player.lock().await;
         let current_playlist_name = player_guard.current_playlist_name();
 
         if self.playlist_name != *current_playlist_name {
             let current_playlist = player_guard.current_playlist();
 
-            self.playlist_name = current_playlist_name.clone();
-            self.playlist_table_rows = current_playlist
-                .iter()
-                .map(|song| {
-                    Row::from_iter(vec![
-                        Cell::new(song.name.clone()),
-                        Cell::new(song.singer.clone()),
-                        Cell::new(song.album.clone()),
-                        Cell::new(format!(
-                            "{:02}:{:02}",
-                            song.duration.clone() / 60000,
-                            song.duration.clone() % 60000 / 1000
-                        )),
-                    ])
-                })
-                .collect();
+            self.set_model(current_playlist_name, current_playlist);
 
             // 更新 playlist_table 的 selected，防止悬空
             self.playlist_table_state.select(None);
-
-            result = Ok(true);
         }
+
+        Ok(())
+    }
+
+    /// 手动设置 model
+    ///
+    /// 在 main_screen 由 self.update_model_by_current_playlist() 调用，在 playlist_screen 由外部直接调用
+    pub fn set_model(&mut self, playlist_name: &String, playlist: &Vec<Song>) {
+        self.playlist_name = playlist_name.clone();
+        self.playlist_table_rows = playlist
+            .iter()
+            .map(|song| {
+                Row::from_iter(vec![
+                    Cell::new(song.name.clone()),
+                    Cell::new(song.singer.clone()),
+                    Cell::new(song.album.clone()),
+                    Cell::new(format!(
+                        "{:02}:{:02}",
+                        song.duration.clone() / 60000,
+                        song.duration.clone() % 60000 / 1000
+                    )),
+                ])
+            })
+            .collect();
+    }
+}
+
+impl<'a> Controller for PlaylistPanel<'a> {
+    async fn update_model(&mut self) -> anyhow::Result<bool> {
+        let mut result = Ok(false);
 
         if self.playlist_table_state.selected() == None && !self.playlist_table_rows.is_empty() {
             self.playlist_table_state.select(Some(0));
@@ -89,18 +102,18 @@ impl<'a> Controller for PlaylistPanel<'a> {
             Command::Up => {
                 self.playlist_table_state.select_previous();
             }
-            Command::Play => {
-                PLAYER
+            Command::EnterOrPlay | Command::Play => {
+                player
                     .lock()
                     .await
                     .play_particularly_now(
                         self.playlist_table_state.selected().unwrap_or(0),
-                        NCM_CLIENT.lock().await,
+                        ncm_client.lock().await,
                     )
                     .await?;
             }
             Command::WhereIsThisSong => {
-                if let Some(index) = PLAYER.lock().await.current_song_index() {
+                if let Some(index) = player.lock().await.current_song_index() {
                     self.playlist_table_state.select(Some(index));
                 }
             }
@@ -114,7 +127,7 @@ impl<'a> Controller for PlaylistPanel<'a> {
             }
             Command::SearchForward(keywords) => {
                 if let Some(selected) = self.playlist_table_state.selected() {
-                    if let Some(next_index) = PLAYER
+                    if let Some(next_index) = player
                         .lock()
                         .await
                         .search_forward_playlist(selected, keywords)
@@ -125,7 +138,7 @@ impl<'a> Controller for PlaylistPanel<'a> {
             }
             Command::SearchBackward(keywords) => {
                 if let Some(selected) = self.playlist_table_state.selected() {
-                    if let Some(next_index) = PLAYER
+                    if let Some(next_index) = player
                         .lock()
                         .await
                         .search_backward_playlist(selected, keywords)
@@ -133,6 +146,9 @@ impl<'a> Controller for PlaylistPanel<'a> {
                         self.playlist_table_state.select(Some(next_index));
                     }
                 }
+            }
+            Command::RefreshPlaylist => {
+                self.update_model_by_current_playlist().await?;
             }
             _ => {}
         }

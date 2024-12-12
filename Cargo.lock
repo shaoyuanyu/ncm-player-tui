@@ -1252,7 +1252,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ncm-client"
+name = "ncm-api"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -1274,7 +1274,7 @@ dependencies = [
  "gstreamer",
  "gstreamer-play",
  "log",
- "ncm-client",
+ "ncm-api",
  "rand",
  "tokio",
 ]
@@ -1292,7 +1292,7 @@ dependencies = [
  "gstreamer-play",
  "lazy_static",
  "log",
- "ncm-client",
+ "ncm-api",
  "ncm-play",
  "ratatui",
  "serde",

@@ -3,7 +3,7 @@ use crate::config::ScreenEnum;
 use anyhow::{anyhow, Result};
 use ncm_play::PlayMode;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Command {
     Quit,
     GotoScreen(ScreenEnum),
@@ -17,13 +17,15 @@ pub enum Command {
     PrevSong,
     SearchForward(Vec<String>),
     SearchBackward(Vec<String>),
+    RefreshPlaylist,
     //
     Down,
     Up,
     NextPanel,
     PrevPanel,
     Esc,
-    Play,
+    EnterOrPlay, // Enter，优先执行进入某菜单的功能，无可进入（所选项为单曲）时播放
+    Play,        // Alt + Enter，优先执行播放功能，所选项为菜单则对其执行 StartPlay
     WhereIsThisSong,
     GoToTop,
     GoToBottom,
@@ -39,7 +41,7 @@ impl Command {
             Some("q" | "quit" | "exit") => Ok(Self::Quit),
             Some("screen") => match tokens.next() {
                 Some("1" | "main") => Ok(Self::GotoScreen(ScreenEnum::Main)),
-                // Some("2" | "playlist" | "playlists") => Ok(Self::GotoScreen(ScreenEnum::Playlists)),
+                Some("2" | "playlist" | "playlists") => Ok(Self::GotoScreen(ScreenEnum::Playlists)),
                 Some("0" | "help") => Ok(Self::GotoScreen(ScreenEnum::Help)),
                 Some(other) => Err(anyhow!("screen: Invalid screen identifier: {}", other)),
                 None => Err(anyhow!("screen: Missing argument SCREEN_ID")),

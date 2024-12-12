@@ -1,6 +1,6 @@
 use anyhow::Result;
 use fast_qr::QRBuilder;
-use ncm_client::NcmClient;
+use ncm_api::NcmClient;
 use std::path::PathBuf;
 
 #[tokio::main]

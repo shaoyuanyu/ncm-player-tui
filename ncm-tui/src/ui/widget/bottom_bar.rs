@@ -1,6 +1,6 @@
 use crate::config::Command;
+use crate::player;
 use crate::ui::Controller;
-use crate::PLAYER;
 use anyhow::Result;
 use ratatui::layout::{Layout, Rect};
 use ratatui::prelude::{Constraint, Direction, Style};
@@ -44,7 +44,7 @@ impl<'a> BottomBar<'a> {
 
 impl<'a> Controller for BottomBar<'a> {
     async fn update_model(&mut self) -> Result<bool> {
-        let player_guard = PLAYER.lock().await;
+        let player_guard = player.lock().await;
 
         // control_bar
         self.info_bar_text = Text::from(

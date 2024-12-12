@@ -15,7 +15,7 @@ pub enum PlayState {
     Ended,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum PlayMode {
     Single,
     SingleRepeat,

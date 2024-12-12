@@ -87,16 +87,16 @@ impl<'a> Controller for MainScreen<'a> {
                 self.focus_panel_outside(Panels::Playlist);
             }
             //
-            (Play, PlaylistOutside) => {
+            (EnterOrPlay, PlaylistOutside) => {
                 self.focus_panel_inside(Panels::Playlist);
             }
-            (Play, LyricOutside) => {
+            (EnterOrPlay, LyricOutside) => {
                 self.focus_panel_inside(Panels::Lyric);
             }
-            (Play, PlaylistInside) => {
+            (EnterOrPlay | Play, PlaylistInside) => {
                 self.playlist_panel.handle_event(cmd).await?;
             }
-            (Play, LyricInside) => {
+            (EnterOrPlay | Play, LyricInside) => {
                 self.lyric_panel.handle_event(cmd).await?;
                 self.focus_panel_outside(Panels::Lyric);
             }
@@ -120,6 +120,10 @@ impl<'a> Controller for MainScreen<'a> {
                 self.focus_panel_inside(Panels::Playlist);
             }
             //
+            (RefreshPlaylist, _) => {
+                self.playlist_panel.handle_event(cmd).await?;
+            }
+            //
             (_, _) => return Ok(false),
         }
 
@@ -139,10 +143,10 @@ impl<'a> Controller for MainScreen<'a> {
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
             .split(chunk);
 
-        // 在左半屏渲染 playlist_table
+        // 在左半屏渲染 playlist_panel
         self.playlist_panel.draw(frame, chunks[0]);
 
-        // 在右半屏渲染 current_song
+        // 在右半屏渲染 lyric_panel
         self.lyric_panel.draw(frame, chunks[1]);
     }
 }

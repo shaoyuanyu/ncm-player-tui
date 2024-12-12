@@ -60,6 +60,7 @@ impl NcmClient {
 
             if let Ok(response) = self.http_client.get(&self.local_api_url).send().await {
                 if response.status().is_success() {
+                    debug!("api check passed");
                     return true;
                 }
             }

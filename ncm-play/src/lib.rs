@@ -5,8 +5,8 @@ use anyhow::{anyhow, Result};
 use gstreamer::ClockTime;
 use gstreamer_play::{gst, Play, PlayVideoRenderer};
 use log::debug;
-use ncm_client::model::Songlist;
-use ncm_client::{
+use ncm_api::model::Songlist;
+use ncm_api::{
     model::{Lyrics, Song},
     NcmClient,
 };

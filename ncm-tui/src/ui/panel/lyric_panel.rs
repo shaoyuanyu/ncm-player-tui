@@ -1,10 +1,10 @@
 use crate::config::Command;
+use crate::player;
 use crate::ui::panel::{
     PanelFocusedStatus, ITEM_SELECTED_STYLE, LYRIC_FOCUSED_STYLE, PANEL_SELECTED_BORDER_STYLE,
 };
 use crate::ui::Controller;
-use crate::PLAYER;
-use ncm_client::model::Song;
+use ncm_api::model::Song;
 use ratatui::layout::Rect;
 use ratatui::prelude::{Line, Style, Text};
 use ratatui::widgets::{Block, Borders, HighlightSpacing, List, ListItem, ListState};
@@ -42,7 +42,7 @@ impl<'a> LyricPanel<'a> {
 impl<'a> Controller for LyricPanel<'a> {
     async fn update_model(&mut self) -> anyhow::Result<bool> {
         let mut result = Ok(false);
-        let player_guard = PLAYER.lock().await;
+        let player_guard = player.lock().await;
 
         if self.song == *player_guard.current_song() {
             // 歌曲仍在播放，当前歌词行需更新；或者无歌曲正在播放
@@ -116,10 +116,10 @@ impl<'a> Controller for LyricPanel<'a> {
             Command::Up => {
                 self.song_lyric_list_state.select_previous();
             }
-            Command::Play => {
+            Command::EnterOrPlay | Command::Play => {
                 // 跳转到对应编号的时间戳处播放
                 let index = self.song_lyric_list_state.selected().unwrap_or(0);
-                PLAYER
+                player
                     .lock()
                     .await
                     .seek_to_timestamp_with_index(index)

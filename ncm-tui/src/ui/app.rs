@@ -1,22 +1,23 @@
 use crate::config::LOGO_LINES;
 use crate::ui::widget::{BottomBar, CommandLine};
 use crate::{
-    actions,
+    actions, command_queue,
     config::{AppMode, Command, ScreenEnum},
+    ncm_client, player,
     ui::{screen::*, Controller},
-    NCM_CLIENT, PLAYER,
 };
 use anyhow::Result;
+use crossterm::event::KeyModifiers;
 use crossterm::{
     event,
     event::{Event, KeyCode, KeyEventKind},
     execute,
     terminal::{disable_raw_mode, LeaveAlternateScreen},
 };
+use log::debug;
 use ratatui::prelude::*;
 use ratatui::style::palette::tailwind;
 use ratatui::widgets::Paragraph;
-use std::collections::VecDeque;
 use std::io::Stdout;
 
 pub struct App<'a> {
@@ -24,10 +25,10 @@ pub struct App<'a> {
     current_screen: ScreenEnum,
     current_mode: AppMode,
     need_re_update_view: bool,
-    command_queue: VecDeque<Command>,
 
     // view
     main_screen: MainScreen<'a>,
+    playlists_screen: PlaylistsScreen<'a>,
     login_screen: LoginScreen<'a>,
     help_screen: HelpScreen<'a>,
     command_line: CommandLine<'a>,
@@ -47,8 +48,8 @@ impl<'a> App<'a> {
             current_screen: ScreenEnum::Launch,
             current_mode: AppMode::Normal,
             need_re_update_view: true,
-            command_queue: VecDeque::new(),
             main_screen: MainScreen::new(&normal_style),
+            playlists_screen: PlaylistsScreen::new(&normal_style),
             login_screen: LoginScreen::new(&normal_style),
             help_screen: HelpScreen::new(&normal_style),
             command_line: CommandLine::new(),
@@ -93,6 +94,12 @@ impl<'a> App<'a> {
         // 初始化，获取用户所有歌单（缩略）和 `用户喜欢的音乐` 歌单（详细信息）
         actions::init_songlists().await?;
 
+        // 提醒 main_screen 更新 playlist
+        command_queue
+            .lock()
+            .await
+            .push_back(Command::RefreshPlaylist);
+
         // 切换到 main_screen
         self.switch_screen(ScreenEnum::Main).await;
 
@@ -113,7 +120,7 @@ impl<'a> App<'a> {
     }
 }
 
-/// Controller
+/// app routine （与 Controller 略有区别）
 impl<'a> App<'a> {
     pub async fn update_model(&mut self) -> Result<()> {
         // screen
@@ -121,6 +128,7 @@ impl<'a> App<'a> {
             ScreenEnum::Help => false,
             ScreenEnum::Login => self.update_login_model().await?,
             ScreenEnum::Main => self.main_screen.update_model().await?,
+            ScreenEnum::Playlists => self.playlists_screen.update_model().await?,
             _ => false,
         };
 
@@ -130,22 +138,29 @@ impl<'a> App<'a> {
         Ok(())
     }
 
-    pub async fn handle_event(&mut self) -> Result<bool> {
-        // 解析命令
+    /// 解析命令
+    pub async fn parse_key_to_event(&mut self) -> Result<()> {
         if let Event::Key(key_event) = event::read()? {
             if key_event.kind == KeyEventKind::Press || key_event.kind == KeyEventKind::Repeat {
                 match (&self.current_mode, key_event.code) {
                     // Normal 模式
-                    (AppMode::Normal, _) => self.get_command_from_key(key_event.code),
+                    (AppMode::Normal, _) => {
+                        self.get_command_from_key(key_event.modifiers, key_event.code)
+                            .await
+                    }
 
                     // Search 模式
                     // 响应 n / N / esc / enter
                     (AppMode::Search(search_keywords), KeyCode::Char('n')) => {
-                        self.command_queue
+                        command_queue
+                            .lock()
+                            .await
                             .push_back(Command::SearchForward(search_keywords.clone()));
                     }
                     (AppMode::Search(search_keywords), KeyCode::Char('N')) => {
-                        self.command_queue
+                        command_queue
+                            .lock()
+                            .await
                             .push_back(Command::SearchBackward(search_keywords.clone()));
                     }
                     (AppMode::Search(_), KeyCode::Esc) => {
@@ -154,20 +169,22 @@ impl<'a> App<'a> {
                     (AppMode::Search(_), KeyCode::Enter | KeyCode::Char(':')) => {
                         // 返回 normal 模式，同时解析对应的命令，后续执行
                         self.back_to_normal_mode();
-                        self.get_command_from_key(key_event.code);
+                        self.get_command_from_key(key_event.modifiers, key_event.code)
+                            .await;
                     }
                     (
                         AppMode::Search(_),
                         KeyCode::Up | KeyCode::Char('k') | KeyCode::Down | KeyCode::Char('j'),
                     ) => {
                         // 不返回 normal 模式，同时解析对应的命令，后续执行
-                        self.get_command_from_key(key_event.code);
+                        self.get_command_from_key(key_event.modifiers, key_event.code)
+                            .await;
                     }
                     (AppMode::Search(_), _) => {}
 
                     // CommandLine 模式
                     (AppMode::CommandLine, KeyCode::Enter) => {
-                        self.parse_command();
+                        self.parse_command().await;
                     }
                     (AppMode::CommandLine, KeyCode::Esc) => {
                         self.back_to_normal_mode();
@@ -186,8 +203,20 @@ impl<'a> App<'a> {
             }
         }
 
-        // 执行命令
-        if let Some(cmd) = self.command_queue.pop_front() {
+        Ok(())
+    }
+
+    /// 事件处理（事件包括按键触发的事件和程序中某部分自行产生的事件）
+    pub async fn handle_event(&mut self) -> Result<bool> {
+        let mut command_queue_guard = command_queue.lock().await;
+        if let Some(cmd) = command_queue_guard.pop_front() {
+            if !command_queue_guard.is_empty() {
+                debug!("command queue: {:?}", command_queue_guard);
+            }
+
+            // 避免死锁
+            drop(command_queue_guard);
+
             // app响应的事件
             match cmd.clone() {
                 Command::Quit => {
@@ -202,22 +231,22 @@ impl<'a> App<'a> {
                 Command::Logout => {
                     self.login_screen = LoginScreen::new(&self.normal_style);
                     // TODO: 清除 cache
-                    NCM_CLIENT.lock().await.logout().await?;
+                    ncm_client.lock().await.logout().await?;
                 }
                 Command::PlayOrPause => {
-                    PLAYER.lock().await.play_or_pause();
+                    player.lock().await.play_or_pause();
                 }
                 Command::SetVolume(vol) => {
-                    PLAYER.lock().await.set_volume(vol);
+                    player.lock().await.set_volume(vol);
                 }
                 Command::SwitchPlayMode(play_mode) => {
-                    PLAYER.lock().await.set_play_mode(play_mode);
+                    player.lock().await.set_play_mode(play_mode);
                 }
                 Command::StartPlay => {
-                    if let Err(e) = PLAYER
+                    if let Err(e) = player
                         .lock()
                         .await
-                        .start_play(NCM_CLIENT.lock().await)
+                        .start_play(ncm_client.lock().await)
                         .await
                     {
                         // self.show_prompt(e.to_string().as_str());
@@ -225,17 +254,17 @@ impl<'a> App<'a> {
                     }
                 }
                 Command::NextSong => {
-                    PLAYER
+                    player
                         .lock()
                         .await
-                        .play_next_song_now(NCM_CLIENT.lock().await)
+                        .play_next_song_now(ncm_client.lock().await)
                         .await?;
                 }
                 Command::PrevSong => {
-                    PLAYER
+                    player
                         .lock()
                         .await
-                        .play_prev_song_now(NCM_CLIENT.lock().await)
+                        .play_prev_song_now(ncm_client.lock().await)
                         .await?;
                 }
                 Command::SearchForward(search_keywords) => {
@@ -254,17 +283,20 @@ impl<'a> App<'a> {
                 | Command::NextPanel
                 | Command::PrevPanel
                 | Command::Esc
+                | Command::EnterOrPlay
                 | Command::Play
                 | Command::WhereIsThisSong
                 | Command::GoToTop
                 | Command::GoToBottom
                 | Command::SearchForward(_)
-                | Command::SearchBackward(_) => {
+                | Command::SearchBackward(_)
+                | Command::RefreshPlaylist => {
                     // 先 update_model(), 再 handle_event()
                     // 取或值
                     // 若写成 self.need_re_update_view = self.need_re_update_view || match ... {} ，match块内的方法可能不被执行
                     self.need_re_update_view = match self.current_screen {
                         ScreenEnum::Main => self.main_screen.handle_event(cmd).await?,
+                        ScreenEnum::Playlists => self.playlists_screen.handle_event(cmd).await?,
                         ScreenEnum::Login => self.login_screen.handle_event(cmd).await?,
                         ScreenEnum::Help => self.help_screen.handle_event(cmd).await?,
                         _ => false,
@@ -284,6 +316,7 @@ impl<'a> App<'a> {
                 ScreenEnum::Help => {}
                 ScreenEnum::Login => self.login_screen.update_view(&self.normal_style),
                 ScreenEnum::Main => self.main_screen.update_view(&self.normal_style),
+                ScreenEnum::Playlists => self.playlists_screen.update_view(&self.normal_style),
                 _ => {}
             }
         }
@@ -325,6 +358,7 @@ impl<'a> App<'a> {
                 ScreenEnum::Help => self.help_screen.draw(frame, chunks[0]),
                 ScreenEnum::Login => self.login_screen.draw(frame, chunks[0]),
                 ScreenEnum::Main => self.main_screen.draw(frame, chunks[0]),
+                ScreenEnum::Playlists => self.playlists_screen.draw(frame, chunks[0]),
                 _ => {}
             }
 
@@ -341,20 +375,28 @@ impl<'a> App<'a> {
 
 /// private
 impl<'a> App<'a> {
-    fn get_command_from_key(&mut self, key_code: KeyCode) {
+    async fn get_command_from_key(&mut self, key_modifiers: KeyModifiers, key_code: KeyCode) {
         let cmd = match key_code {
             KeyCode::Down => Command::Down,
             KeyCode::Char('j') => Command::Down,
             KeyCode::Up => Command::Up,
             KeyCode::Char('k') => Command::Up,
             KeyCode::Char(' ') => Command::PlayOrPause,
-            KeyCode::Enter => Command::Play,
+            KeyCode::Enter => {
+                debug!("enter, whether containing SHIFT? : {:?}", key_modifiers);
+                if key_modifiers.contains(KeyModifiers::ALT) {
+                    Command::Play
+                } else {
+                    Command::EnterOrPlay
+                }
+            }
             KeyCode::Esc => Command::Esc,
             KeyCode::Right => Command::NextPanel,
             KeyCode::Char('l') => Command::NextPanel,
             KeyCode::Left => Command::PrevPanel,
             KeyCode::Char('h') => Command::PrevPanel,
             KeyCode::Char('1') => Command::GotoScreen(ScreenEnum::Main),
+            KeyCode::Char('2') => Command::GotoScreen(ScreenEnum::Playlists),
             KeyCode::Char('0') => Command::GotoScreen(ScreenEnum::Help),
             KeyCode::F(1) => Command::GotoScreen(ScreenEnum::Help),
             KeyCode::Char('.') | KeyCode::Char('。') => Command::NextSong,
@@ -377,17 +419,17 @@ impl<'a> App<'a> {
             _ => Command::Nop,
         };
 
-        self.command_queue.push_back(cmd);
+        command_queue.lock().await.push_back(cmd);
     }
 
-    fn parse_command(&mut self) {
+    async fn parse_command(&mut self) {
         let input_cmd = self.command_line.get_content();
 
         self.back_to_normal_mode();
 
         match Command::parse(&input_cmd) {
             Ok(cmd) => {
-                self.command_queue.push_back(cmd);
+                command_queue.lock().await.push_back(cmd);
             }
             Err(e) => {
                 self.command_line.set_content(format!("{e}").as_str());
@@ -420,7 +462,7 @@ impl<'a> App<'a> {
         //
         let need_redraw = self.login_screen.update_model().await?;
 
-        if NCM_CLIENT.lock().await.is_login() {
+        if ncm_client.lock().await.is_login() {
             // 登录成功
             self.init_after_login().await?;
             Ok(true)
@@ -431,7 +473,7 @@ impl<'a> App<'a> {
 
     async fn switch_screen(&mut self, to_screen: ScreenEnum) {
         // 已登录状态不能切换到 login_screen
-        let ncm_client_guard = NCM_CLIENT.lock().await;
+        let ncm_client_guard = ncm_client.lock().await;
         if to_screen == ScreenEnum::Login && ncm_client_guard.is_login() {
             if let Some(login_account) = ncm_client_guard.login_account() {
                 self.command_line.set_content(
@@ -456,7 +498,15 @@ impl<'a> App<'a> {
         }
 
         // 切换到 main_screen 时释放当前屏幕（节省内存开销）
-        // TODO
+        match self.current_screen {
+            ScreenEnum::Login => {
+                self.login_screen = LoginScreen::new(&self.normal_style);
+            }
+            ScreenEnum::Playlists => {
+                self.playlists_screen = PlaylistsScreen::new(&self.normal_style);
+            }
+            _ => {}
+        }
 
         self.need_re_update_view = true;
         self.current_screen = to_screen;

@@ -1,7 +1,9 @@
 mod lyric_panel;
+mod playlist_candidate_panel;
 mod playlist_panel;
 
 pub use lyric_panel::*;
+pub use playlist_candidate_panel::*;
 pub use playlist_panel::*;
 
 use ratatui::prelude::{Modifier, Style};
