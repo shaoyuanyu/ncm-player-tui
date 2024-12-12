@@ -477,8 +477,11 @@ fn encode_lyrics(
     // 正则表达式
     let timestamp_re = Regex::new(r"\[\d+:\d+.\d+]").unwrap(); // 时间戳
     let timestamp_abnormal_re = Regex::new(r"^\[(\d+):(\d+):(\d+)]").unwrap(); // 不正常时间戳
+    let timestamp_9bit_re = Regex::new(r"\[(\d+):(\d+).(\d)]").unwrap(); // 9位时间戳（小数点后ms部分只有1位）
     let timestamp_10bit_re = Regex::new(r"\[(\d+):(\d+).(\d)(\d)]").unwrap(); // 10位时间戳（小数点后ms部分只有2位）
     let timestamp_7bit_re = Regex::new(r"\[(\d+):(\d+)]").unwrap(); // 7位时间戳（无小数点及ms部分）
+
+    // 修正闭包
     let fix_line = |line: &String| -> String {
         let mut fixed = timestamp_7bit_re
             .replace_all(line, "[$1:$2.000]")
@@ -486,13 +489,16 @@ fn encode_lyrics(
         fixed = timestamp_10bit_re
             .replace_all(&fixed, "[$1:$2.0$3$4]")
             .to_string();
+        fixed = timestamp_9bit_re
+            .replace_all(&fixed, "[$1:$2.00$3]")
+            .to_string();
         fixed = timestamp_abnormal_re
             .replace_all(&fixed, "[$1:$2.$3]")
             .to_string();
         fixed.to_string()
     };
 
-    // 修正
+    // 进行修正
     let fixed_lyric_lines: Vec<String> = origin_lyric_lines.iter().map(fix_line).collect();
     let fixed_trans_lyric_lines: Vec<String> =
         origin_trans_lyric_lines.iter().map(fix_line).collect();
