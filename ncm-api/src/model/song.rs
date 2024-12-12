@@ -19,4 +19,6 @@ pub struct Song {
     pub duration: u64,
     /// 歌曲链接
     pub song_url: Option<String>,
+    /// 音质
+    pub quality_level: String,
 }

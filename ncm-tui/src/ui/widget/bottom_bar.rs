@@ -17,6 +17,7 @@ pub struct BottomBar<'a> {
     playback_label: String,
     song_name: Option<String>,
     singer_name: Option<String>,
+    song_quality_level: Option<String>,
     //
     volume: f64,
 
@@ -34,6 +35,7 @@ impl<'a> BottomBar<'a> {
             playback_label: String::new(),
             song_name: None,
             singer_name: None,
+            song_quality_level: None,
             volume: 0.0,
             control_bar: Paragraph::default(),
             playback_bar: Gauge::default(),
@@ -81,9 +83,10 @@ impl<'a> Controller for BottomBar<'a> {
             self.playback_ratio = 0.0;
             self.playback_label = String::from("--:--/--:--");
         };
-        if let Some(song_info) = player_guard.current_song().clone() {
-            self.song_name = Some(song_info.name.clone());
-            self.singer_name = Some(song_info.singer.clone());
+        if let Some(song) = player_guard.current_song().clone() {
+            self.song_name = Some(song.name.clone());
+            self.singer_name = Some(song.singer.clone());
+            self.song_quality_level = Some(song.quality_level.clone());
         }
 
         // volume_bar
@@ -105,12 +108,13 @@ impl<'a> Controller for BottomBar<'a> {
         self.playback_bar = Gauge::default()
             .block({
                 let mut block = Block::default().borders(Borders::ALL).style(*style);
-                if let (Some(song_name), Some(artist_name)) =
-                    (self.song_name.clone(), self.singer_name.clone())
+                if let (Some(song_name), Some(artist_name), Some(song_quality_level)) =
+                    (self.song_name.clone(), self.singer_name.clone(), self.song_quality_level.clone())
                 {
                     block = block
                         .title_top(Line::from(format!("{}", song_name)).centered())
-                        .title_bottom(Line::from(format!("{}", artist_name)).centered());
+                        .title_bottom(Line::from(format!("{}", artist_name)).centered())
+                        .title_bottom(Line::from(format!("音质:{}", song_quality_level)).right_aligned());
                 }
                 block
             })

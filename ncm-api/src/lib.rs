@@ -372,6 +372,7 @@ impl NcmClient {
                     album_id: track["al"]["id"].as_u64().unwrap(),
                     duration: track["dt"].as_u64().unwrap(),
                     song_url: None,
+                    quality_level: String::new(),
                 };
                 songlist.songs.push(song);
             }
@@ -421,6 +422,9 @@ impl NcmClient {
 
         if let Some(song_url) = v_song_url["data"][0]["url"].as_str() {
             song.song_url = Some(song_url.to_string());
+        }
+        if let Some(quality_level) = v_song_url["data"][0]["level"].as_str() {
+            song.quality_level = quality_level.to_string();
         }
 
         Ok(())
