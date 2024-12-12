@@ -56,7 +56,7 @@ impl NcmClient {
         self.api_child_process = Some(api_child_process);
 
         for _ in 0..30 {
-            tokio::time::sleep(std::time::Duration::from_micros(500)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
             if let Ok(response) = self.http_client.get(&self.local_api_url).send().await {
                 if response.status().is_success() {
@@ -449,15 +449,14 @@ impl NcmClient {
             .map(|s| s.to_string())
             .collect();
 
-        debug!("{:?}", origin_trans_lyric_lines);
-        debug!("{:?}", origin_roman_lyric_lines);
-
         // 编码歌词
         let lyrics = encode_lyrics(
             origin_lyric_lines,
             origin_trans_lyric_lines,
             origin_roman_lyric_lines,
         );
+
+        debug!("lyrics encoded: {:?}", lyrics);
 
         // 将歌词缓存到本地
         self.store_lyrics_cache(song_id, &lyrics);
