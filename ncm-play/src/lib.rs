@@ -435,26 +435,32 @@ impl Player {
     /// 播放下一首
     async fn play_next<'c>(&mut self, ncm_client_guard: MutexGuard<'c, NcmClient>) -> Result<()> {
         if let Some(mut song) = self.current_song.clone() {
-            // 获取歌曲 uri
-            ncm_client_guard.load_song_url(&mut song).await?;
+            // 检查歌曲是否可获取（版权/会员/...限制）
+            if ncm_client_guard.check_song_availability(song.id).await? {
+                // 获取歌曲 uri
+                ncm_client_guard.load_song_url(&mut song).await?;
 
-            // 更新当前歌曲信息
-            self.current_song = Some(song.clone());
+                // 更新当前歌曲信息
+                self.current_song = Some(song.clone());
 
-            if let Some(url) = song.song_url {
-                // 入栈播放历史
-                if let Some(index) = self.current_song_index {
-                    self.play_index_history_stack.push(index);
+                if let Some(url) = song.song_url {
+                    // 入栈播放历史
+                    if let Some(index) = self.current_song_index {
+                        self.play_index_history_stack.push(index);
+                    }
+
+                    // 获取歌词
+                    self.update_current_song_lyrics(ncm_client_guard).await?;
+
+                    // 播放
+                    self.play_new_song_by_uri(url.as_str());
+
+                    // 播放状态
+                    self.play_state = PlayState::Playing;
                 }
-
-                // 获取歌词
-                self.update_current_song_lyrics(ncm_client_guard).await?;
-
-                // 播放
-                self.play_new_song_by_uri(url.as_str());
-
-                // 播放状态
-                self.play_state = PlayState::Playing;
+            } else {
+                // 更新播放状态为 Ended ，以便继续寻找下一首
+                self.play_state = PlayState::Ended;
             }
         } else {
             // 播放状态
