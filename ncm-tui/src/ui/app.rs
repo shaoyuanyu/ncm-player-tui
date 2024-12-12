@@ -1,6 +1,11 @@
 use crate::config::LOGO_LINES;
 use crate::ui::widget::{BottomBar, CommandLine};
-use crate::{actions, config::{AppMode, Command, ScreenEnum}, ui::{screen::*, Controller}, NCM_CLIENT, PLAYER};
+use crate::{
+    actions,
+    config::{AppMode, Command, ScreenEnum},
+    ui::{screen::*, Controller},
+    NCM_CLIENT, PLAYER,
+};
 use anyhow::Result;
 use crossterm::{
     event,
@@ -425,6 +430,7 @@ impl<'a> App<'a> {
     }
 
     async fn switch_screen(&mut self, to_screen: ScreenEnum) {
+        // 已登录状态不能切换到 login_screen
         let ncm_client_guard = NCM_CLIENT.lock().await;
         if to_screen == ScreenEnum::Login && ncm_client_guard.is_login() {
             if let Some(login_account) = ncm_client_guard.login_account() {
@@ -444,9 +450,13 @@ impl<'a> App<'a> {
         }
         drop(ncm_client_guard);
 
+        // 切换到 main_screen 时显示提示
         if to_screen == ScreenEnum::Main {
             self.command_line.set_content("按0或F1键查看help页面");
         }
+
+        // 切换到 main_screen 时释放当前屏幕（节省内存开销）
+        // TODO
 
         self.need_re_update_view = true;
         self.current_screen = to_screen;
