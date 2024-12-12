@@ -18,18 +18,20 @@ pub enum Command {
     SearchForward(Vec<String>),
     SearchBackward(Vec<String>),
     RefreshPlaylist,
-    //
+
     Down,
     Up,
     NextPanel,
     PrevPanel,
     Esc,
-    EnterOrPlay, // Enter，优先执行进入某菜单的功能，无可进入（所选项为单曲）时播放
-    Play,        // Alt + Enter，优先执行播放功能，所选项为菜单则对其执行 StartPlay
+    /// Enter，优先执行进入某菜单的功能，无可进入（所选项为单曲）时播放
+    EnterOrPlay,
+    /// Alt + Enter，优先执行播放功能，所选项为菜单则对其执行 StartPlay
+    Play,
     WhereIsThisSong,
     GoToTop,
     GoToBottom,
-    //
+
     Nop,
 }
 
