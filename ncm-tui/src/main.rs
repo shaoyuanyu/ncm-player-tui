@@ -1,3 +1,4 @@
+mod actions;
 mod config;
 mod ui;
 

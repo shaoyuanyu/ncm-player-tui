@@ -1,10 +1,6 @@
 use crate::config::LOGO_LINES;
 use crate::ui::widget::{BottomBar, CommandLine};
-use crate::{
-    config::{AppMode, Command, ScreenEnum},
-    ui::{screen::*, Controller},
-    NCM_CLIENT, PLAYER,
-};
+use crate::{actions, config::{AppMode, Command, ScreenEnum}, ui::{screen::*, Controller}, NCM_CLIENT, PLAYER};
 use anyhow::Result;
 use crossterm::{
     event,
@@ -12,7 +8,6 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, LeaveAlternateScreen},
 };
-use log::debug;
 use ratatui::prelude::*;
 use ratatui::style::palette::tailwind;
 use ratatui::widgets::Paragraph;
@@ -90,20 +85,10 @@ impl<'a> App<'a> {
 
     /// cookie 登录/二维码登录后均调用
     pub async fn init_after_login(&mut self) -> Result<()> {
-        // TODO: 改在 ncm-play 中初始化用户的所有歌单
-        let ncm_client_guard = NCM_CLIENT.lock().await;
-        if let Ok(mut songlists) = ncm_client_guard.get_user_all_songlists().await {
-            if let Some(songlist) = songlists.get_mut(0) {
-                debug!("{:?}", songlist);
-                ncm_client_guard.load_songlist_songs(songlist).await?;
-                PLAYER
-                    .lock()
-                    .await
-                    .switch_playlist(songlist.name.clone(), songlist.songs.to_owned());
-            }
-        }
-        drop(ncm_client_guard);
+        // 初始化，获取用户所有歌单（缩略）和 `用户喜欢的音乐` 歌单（详细信息）
+        actions::init_songlists().await?;
 
+        // 切换到 main_screen
         self.switch_screen(ScreenEnum::Main).await;
 
         Ok(())

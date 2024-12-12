@@ -72,12 +72,13 @@ impl<'a> Controller for MainScreen<'a> {
         let player_guard = PLAYER.lock().await;
 
         // playlist
-        if self.playlist_name != *player_guard.current_playlist_name() {
+        let current_playlist_name = player_guard.current_playlist_name();
+        let current_playlist = player_guard.current_playlist();
+
+        if self.playlist_name != *current_playlist_name {
+            self.playlist_name = current_playlist_name.clone();
             //
-            self.playlist_name = player_guard.current_playlist_name().clone();
-            //
-            self.playlist_table_rows = player_guard
-                .current_playlist()
+            self.playlist_table_rows = current_playlist
                 .iter()
                 .map(|song| {
                     Row::from_iter(vec![
@@ -110,10 +111,10 @@ impl<'a> Controller for MainScreen<'a> {
             // current_focus_panel 不为 LyricInside 时，自动更新当前歌词行
             // current_focus_panel 为 LyricInside 时，根据用户选择选中歌词行
             if self.current_focus_panel != FocusPanel::LyricInside {
-                if self.song_lyric_list_state.selected() != player_guard.current_song_lyric_index()
+                if self.song_lyric_list_state.selected() != player_guard.current_lyric_line_index()
                 {
                     self.song_lyric_list_state
-                        .select(player_guard.current_song_lyric_index());
+                        .select(player_guard.current_lyric_line_index());
 
                     result = Ok(true);
                 }
