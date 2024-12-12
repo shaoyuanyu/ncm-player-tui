@@ -200,9 +200,8 @@ impl Player {
         keywords: Vec<String>,
     ) -> Option<usize> {
         if start_index + 1 < self.current_playlist.len() {
-            let playlist_backward_iter = self.current_playlist[start_index + 1..]
-                .iter()
-                .enumerate();
+            let playlist_backward_iter =
+                self.current_playlist[start_index + 1..].iter().enumerate();
 
             if let Some(offset) = search_in_iter(playlist_backward_iter, keywords) {
                 return Some(start_index + 1 + offset);
@@ -312,8 +311,7 @@ impl Player {
                     Ok(())
                 }
                 PlayMode::Shuffle => {
-                    let index =
-                        thread_rng().gen_range(0..self.current_playlist.len());
+                    let index = thread_rng().gen_range(0..self.current_playlist.len());
                     self.current_song_index = Some(index);
                     self.current_song = Some(self.current_playlist[index].clone());
                     self.play_next(ncm_client_guard).await?;
@@ -417,8 +415,7 @@ impl Player {
             }
             PlayMode::Shuffle => {
                 if let Some(mut index) = self.current_song_index {
-                    index =
-                        thread_rng().gen_range(0..self.current_playlist.len());
+                    index = thread_rng().gen_range(0..self.current_playlist.len());
                     self.current_song_index = Some(index);
                     Some(self.current_playlist[index].clone())
                 } else {
