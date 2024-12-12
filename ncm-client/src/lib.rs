@@ -55,8 +55,8 @@ impl NcmClient {
 
         self.api_child_process = Some(api_child_process);
 
-        for _ in 0..10 {
-            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        for _ in 0..30 {
+            tokio::time::sleep(std::time::Duration::from_micros(500)).await;
 
             if let Ok(response) = self.http_client.get(&self.local_api_url).send().await {
                 if response.status().is_success() {
