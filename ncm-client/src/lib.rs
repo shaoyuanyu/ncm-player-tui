@@ -585,5 +585,6 @@ fn encode_lyrics(
         }
     }
 
+    lyrics.reverse();
     lyrics
 }
