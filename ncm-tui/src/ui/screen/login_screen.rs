@@ -11,10 +11,10 @@ use ratatui::{
 
 pub struct LoginScreen<'a> {
     // model
-    login_url: String,           // 登录 url
-    login_unikey: String,        // 登录 url 校验码
-    login_qrcode: String,        // 登录二维码 (从 login_url 生成)
-    login_qrcode_status: String, // 登录二维码状态
+    login_url: String,                 // 登录 url
+    login_unikey: String,              // 登录 url 校验码
+    login_qrcode_lines: Vec<Line<'a>>, // 登录二维码（按行）
+    login_qrcode_status: String,       // 登录二维码状态
     is_login_ok_refreshed: bool, // 标志控制位，控制登录完成后第一次 update_model 更新“登录成功”的信息，第二次 update_model 才进行 cookie 保存等高延迟操作
 
     // view
@@ -25,13 +25,12 @@ impl<'a> LoginScreen<'a> {
     pub fn new(normal_style: &Style) -> Self {
         let login_qr_url = String::from("");
         let login_unikey = String::from("");
-        let login_qrcode = String::from("「...」");
         let login_qrcode_status = String::from("二维码获取中");
 
         let mut s = Self {
             login_url: login_qr_url,
             login_unikey,
-            login_qrcode,
+            login_qrcode_lines: vec![Line::from("「...」").centered()],
             login_qrcode_status,
             login_page: Paragraph::default(),
             is_login_ok_refreshed: false,
@@ -45,7 +44,13 @@ impl<'a> LoginScreen<'a> {
 
         self.login_unikey = qr_unikey;
         self.login_url = qr_url;
-        self.login_qrcode = QRBuilder::new(self.login_url.clone()).build()?.to_str();
+        let qrcode = QRBuilder::new(self.login_url.clone()).build()?.to_str();
+        // self.login_qrcode = qrcode.clone();
+        self.login_qrcode_lines = qrcode
+            .split('\n')
+            .into_iter()
+            .map(|s| Line::from(s.to_owned()).centered())
+            .collect();
         self.is_login_ok_refreshed = false;
 
         Ok(())
@@ -106,12 +111,12 @@ impl<'a> Controller for LoginScreen<'a> {
     }
 
     fn update_view(&mut self, style: &Style) {
-        let login_text = Text::from(format!(
-            "netease cloud music - QR code login\n\
-                {}\n\
-                {}",
-            self.login_qrcode, self.login_qrcode_status
-        ));
+        let mut lines = vec![Line::from("netease cloud music - QR code login").centered()];
+        lines.append(&mut self.login_qrcode_lines.clone());
+        lines.push(Line::from(self.login_qrcode_status.clone()).centered());
+
+        let login_text = Text::from(lines);
+
         self.login_page = Paragraph::new(login_text)
             .block(Block::default().title("Login").borders(Borders::ALL))
             .style(*style);
