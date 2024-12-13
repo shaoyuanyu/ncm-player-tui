@@ -83,10 +83,10 @@ impl NcmClient {
     }
 }
 
-/// private
+// 登录 api
 impl NcmClient {
     /// 保存 cookie
-    fn store_cookie(&self) {
+    pub fn store_cookie(&self) {
         match fs::OpenOptions::new()
             .write(true)
             .create(true)
@@ -112,42 +112,6 @@ impl NcmClient {
         }
     }
 
-    /// 缓存歌词
-    fn store_lyrics_cache(&self, song_id: u64, lyrics: &Lyrics) {
-        match serde_json::to_string(lyrics) {
-            Ok(lyrics_json) => match fs::OpenOptions::new()
-                .write(true)
-                .create(true)
-                .truncate(true)
-                .open(self.lyrics_path.clone().join(format!("{}.lyrics", song_id)))
-            {
-                Ok(mut lyrics_file) => match lyrics_file.write_all(lyrics_json.as_bytes()) {
-                    Ok(_) => debug!("lyrics stored at {:?}", &self.lyrics_path),
-                    Err(err) => {
-                        error!("failed to store lyrics at {:?}: {}", &self.lyrics_path, err)
-                    }
-                },
-                Err(err) => error!("{:?}", err),
-            },
-            Err(err) => error!("{:?}", err),
-        }
-    }
-
-    /// 尝试读本地歌词缓存
-    fn try_read_lyrics_cache(&self, song_id: u64) -> Result<Lyrics> {
-        let mut lyrics_file =
-            File::open(self.lyrics_path.clone().join(format!("{}.lyrics", song_id)))?;
-        let mut json_data = String::new();
-        lyrics_file.read_to_string(&mut json_data)?;
-        let lyrics: Lyrics = serde_json::from_str(&json_data)?;
-        debug!("read lyrics from cache: {:?}", lyrics);
-
-        Ok(lyrics)
-    }
-}
-
-// 登录 api
-impl NcmClient {
     /// 尝试从本地读取 cookie 登录
     pub async fn try_cookie_login(&mut self) -> Result<bool> {
         self.read_cookie();
@@ -163,7 +127,7 @@ impl NcmClient {
         }
     }
 
-    /// 获取登录二维码 (url, uni_key)
+    /// 获取登录二维码 (uni_key, url)
     pub async fn get_login_qr(&self) -> Result<(String, String)> {
         let key_response = self
             .http_client
@@ -194,6 +158,10 @@ impl NcmClient {
                 .await?;
 
             if create_response.code == 200 {
+                debug!(
+                    "get login qr key & url: {}, {}",
+                    uni_key, create_response.data.qrurl
+                );
                 Ok((uni_key, create_response.data.qrurl))
             } else {
                 Err(anyhow!("failed to get login qr url"))
@@ -218,10 +186,11 @@ impl NcmClient {
             .json::<QrCheckResponse>()
             .await?;
 
+        debug!("check login qr status: {}", check_response.code);
+
+        // 登录成功
         if check_response.code == 803 {
-            // 登录成功，保存 cookie
             self.cookie = check_response.cookie;
-            self.store_cookie();
         }
 
         Ok(check_response.code)
@@ -486,6 +455,39 @@ impl NcmClient {
 
         // 将歌词缓存到本地
         self.store_lyrics_cache(song_id, &lyrics);
+
+        Ok(lyrics)
+    }
+
+    /// 缓存歌词
+    fn store_lyrics_cache(&self, song_id: u64, lyrics: &Lyrics) {
+        match serde_json::to_string(lyrics) {
+            Ok(lyrics_json) => match fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(self.lyrics_path.clone().join(format!("{}.lyrics", song_id)))
+            {
+                Ok(mut lyrics_file) => match lyrics_file.write_all(lyrics_json.as_bytes()) {
+                    Ok(_) => debug!("lyrics stored at {:?}", &self.lyrics_path),
+                    Err(err) => {
+                        error!("failed to store lyrics at {:?}: {}", &self.lyrics_path, err)
+                    }
+                },
+                Err(err) => error!("{:?}", err),
+            },
+            Err(err) => error!("{:?}", err),
+        }
+    }
+
+    /// 尝试读本地歌词缓存
+    fn try_read_lyrics_cache(&self, song_id: u64) -> Result<Lyrics> {
+        let mut lyrics_file =
+            File::open(self.lyrics_path.clone().join(format!("{}.lyrics", song_id)))?;
+        let mut json_data = String::new();
+        lyrics_file.read_to_string(&mut json_data)?;
+        let lyrics: Lyrics = serde_json::from_str(&json_data)?;
+        debug!("read lyrics from cache: {:?}", lyrics);
 
         Ok(lyrics)
     }
