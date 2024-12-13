@@ -108,13 +108,17 @@ impl<'a> Controller for BottomBar<'a> {
         self.playback_bar = Gauge::default()
             .block({
                 let mut block = Block::default().borders(Borders::ALL).style(*style);
-                if let (Some(song_name), Some(artist_name), Some(song_quality_level)) =
-                    (self.song_name.clone(), self.singer_name.clone(), self.song_quality_level.clone())
-                {
+                if let (Some(song_name), Some(artist_name), Some(song_quality_level)) = (
+                    self.song_name.clone(),
+                    self.singer_name.clone(),
+                    self.song_quality_level.clone(),
+                ) {
                     block = block
                         .title_top(Line::from(format!("{}", song_name)).centered())
                         .title_bottom(Line::from(format!("{}", artist_name)).centered())
-                        .title_bottom(Line::from(format!("音质:{}", song_quality_level)).right_aligned());
+                        .title_bottom(
+                            Line::from(format!("音质:{}", song_quality_level)).right_aligned(),
+                        );
                 }
                 block
             })

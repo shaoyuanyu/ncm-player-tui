@@ -390,7 +390,10 @@ impl NcmClient {
     pub async fn check_song_availability(&self, song_id: u64) -> Result<bool> {
         let check_response = self
             .http_client
-            .post(format!("{}/check/music?id={}", &self.local_api_url, song_id))
+            .post(format!(
+                "{}/check/music?id={}",
+                &self.local_api_url, song_id
+            ))
             .form(&[("cookie", &self.cookie)])
             .send()
             .await?;
