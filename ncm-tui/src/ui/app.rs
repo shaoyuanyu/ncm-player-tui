@@ -109,6 +109,8 @@ impl<'a> App<'a> {
     /// 尝试 cookie 登录失败后调用
     pub async fn init_after_no_login(&mut self) {
         self.switch_screen(ScreenEnum::Main).await;
+        self.command_line
+            .set_content("按下`:`进行命令输入，输入`login`命令进入登录页面");
     }
 
     pub fn restore_terminal(&mut self) -> Result<()> {
@@ -383,7 +385,6 @@ impl<'a> App<'a> {
             KeyCode::Char('k') => Command::Up,
             KeyCode::Char(' ') => Command::PlayOrPause,
             KeyCode::Enter => {
-                debug!("enter, whether containing SHIFT? : {:?}", key_modifiers);
                 if key_modifiers.contains(KeyModifiers::ALT) {
                     Command::Play
                 } else {
