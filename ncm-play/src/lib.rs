@@ -476,10 +476,12 @@ impl Player {
     ) -> Result<()> {
         if let Some(current_song) = self.current_song.as_ref() {
             if let Ok(lyrics) = ncm_client_guard.get_song_lyrics(current_song.id).await {
-                self.current_song_lyrics = Some(lyrics);
-                self.current_lyric_line_index = Some(0);
+                if !lyrics.is_empty() {
+                    self.current_song_lyrics = Some(lyrics);
+                    self.current_lyric_line_index = Some(0);
 
-                return Ok(());
+                    return Ok(());
+                }
             }
         }
 

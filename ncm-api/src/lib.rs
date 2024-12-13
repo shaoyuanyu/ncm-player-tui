@@ -418,7 +418,7 @@ impl NcmClient {
 
         let v_lyric: Value = serde_json::from_slice(&lyric_response.bytes().await?)?;
 
-        let lyric_text = v_lyric["lrc"]["lyric"].as_str().unwrap().to_string();
+        let lyric_text = v_lyric["lrc"]["lyric"].as_str().unwrap_or("").to_string();
         let trans_lyric_text = v_lyric["tlyric"]["lyric"]
             .as_str()
             .unwrap_or("")
