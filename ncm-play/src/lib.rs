@@ -4,7 +4,7 @@ pub use config::*;
 use anyhow::{anyhow, Result};
 use gstreamer::ClockTime;
 use gstreamer_play::{gst, Play, PlayVideoRenderer};
-use log::debug;
+use log::{debug, trace};
 use ncm_api::model::Songlist;
 use ncm_api::{
     model::{Lyrics, Song},
@@ -508,7 +508,7 @@ impl Player {
                         current_song_lyrics[current_lyric_line_index + 1].timestamp;
 
                     if current_position.mseconds() >= next_timestamp {
-                        debug!(
+                        trace!(
                             "[auto lyric forward] current msec: {}, next timestamp: {}",
                             current_position.mseconds(),
                             next_timestamp

@@ -396,7 +396,18 @@ impl NcmClient {
             song.song_url = Some(song_url.to_string());
         }
         if let Some(quality_level) = v_song_url["data"][0]["level"].as_str() {
-            song.quality_level = quality_level.to_string();
+            song.quality_level = match quality_level {
+                "standard" => String::from("标准"),
+                "higher" => String::from("较高"),
+                "exhigh" => String::from("极高"),
+                "lossless" => String::from("无损"),
+                "hires" => String::from("Hi-Res"),
+                "jyeffect" => String::from("高清环绕声"),
+                "sky" => String::from("沉浸环绕声"),
+                "dolby" => String::from("杜比全景声"),
+                "jymaster" => String::from("超清母带"),
+                _ => quality_level.to_string(),
+            };
         }
 
         Ok(())
