@@ -182,7 +182,7 @@ impl<'a> Controller for PlaylistsScreen<'a> {
         // 分为左右两个面板
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(30), Constraint::Percentage(70)].as_ref())
+            .constraints([Constraint::Percentage(40), Constraint::Percentage(60)].as_ref())
             .split(chunk);
 
         // 在左半屏渲染 playlist_candidate_panel

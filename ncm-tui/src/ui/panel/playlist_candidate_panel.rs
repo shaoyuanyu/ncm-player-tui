@@ -124,7 +124,7 @@ impl<'a> Controller for PlaylistCandidatePanel<'a> {
         playlists_list = playlists_list.block({
             let mut block = Block::default()
                 .title(Line::from(format!("{}收藏的歌单", self.username)))
-                .title_bottom(Line::from("按下 Alt + Enter 开始播放该歌单").centered())
+                .title_bottom(Line::from("按下`Alt+Enter`开始播放选中歌单").centered())
                 .borders(Borders::ALL);
             if self.focused_status == PanelFocusedStatus::Outside {
                 block = block.border_style(PANEL_SELECTED_BORDER_STYLE);
