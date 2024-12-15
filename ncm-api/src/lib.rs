@@ -544,7 +544,7 @@ fn encode_lyrics(
             let timestamp = (lyric_line[1..=2].parse::<u64>().unwrap() * 60
                 + lyric_line[4..=5].parse::<u64>().unwrap())
                 * 1000
-                + lyric_line[7..=9].parse::<u64>().unwrap_or(0) * 10;
+                + lyric_line[7..=9].parse::<u64>().unwrap_or(0);
 
             lyrics.push(LyricLine {
                 timestamp,

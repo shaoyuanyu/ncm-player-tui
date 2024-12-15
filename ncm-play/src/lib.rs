@@ -425,13 +425,6 @@ impl Player {
         };
     }
 
-    fn play_new_song_by_uri(&mut self, uri: &str) {
-        self.play.stop();
-        self.play.set_uri(Some(uri));
-        self.play.set_volume(self.volume);
-        self.play.play();
-    }
-
     /// 播放下一首
     async fn play_next<'c>(&mut self, ncm_client_guard: MutexGuard<'c, NcmClient>) -> Result<()> {
         if let Some(mut song) = self.current_song.clone() {
@@ -453,10 +446,12 @@ impl Player {
                     self.update_current_song_lyrics(ncm_client_guard).await?;
 
                     // 播放
-                    self.play_new_song_by_uri(url.as_str());
+                    self.play_new_song_by_uri(url.as_str()).await;
 
                     // 播放状态
                     self.play_state = PlayState::Playing;
+
+                    debug!("play next song: {:?}", self.current_song);
                 }
             } else {
                 // 更新播放状态为 Ended ，以便继续寻找下一首
@@ -468,6 +463,16 @@ impl Player {
         }
 
         Ok(())
+    }
+
+    async fn play_new_song_by_uri(&mut self, uri: &str) {
+        self.play.stop();
+        self.play.set_uri(Some(uri));
+        self.play.set_volume(self.volume);
+        self.play.play();
+
+        // 缓冲 500 ms ，防止出现切换到下一首歌但 gstreamer 端还未更新完成，这会引起歌词快进现象
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
     }
 
     async fn update_current_song_lyrics<'c>(
@@ -503,6 +508,12 @@ impl Player {
                         current_song_lyrics[current_lyric_line_index + 1].timestamp;
 
                     if current_position.mseconds() >= next_timestamp {
+                        debug!(
+                            "[auto lyric forward] current msec: {}, next timestamp: {}",
+                            current_position.mseconds(),
+                            next_timestamp
+                        );
+
                         self.current_lyric_line_index = Some(current_lyric_line_index + 1);
                     }
                 }
