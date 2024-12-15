@@ -17,7 +17,9 @@ pub enum PanelFocusedStatus {
     Nop,
 }
 
-const PANEL_SELECTED_BORDER_STYLE: Style = Style::new().fg(tailwind::RED.c800);
+const PANEL_SELECTED_BORDER_STYLE: Style = Style::new()
+    .fg(tailwind::RED.c700)
+    .add_modifier(Modifier::BOLD);
 
 const ITEM_SELECTED_STYLE: Style = Style::new()
     .bg(tailwind::RED.c400)
