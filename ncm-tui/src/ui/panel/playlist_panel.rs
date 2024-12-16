@@ -4,9 +4,9 @@ use crate::ui::Controller;
 use crate::{ncm_client, player};
 use ncm_api::model::Song;
 use ratatui::layout::{Constraint, Rect};
-use ratatui::prelude::Style;
+use ratatui::prelude::{Margin, Style};
 use ratatui::style::palette::tailwind;
-use ratatui::widgets::{Block, Borders, Cell, Row, Table, TableState};
+use ratatui::widgets::{Block, Borders, Cell, Row, Scrollbar, ScrollbarOrientation, ScrollbarState, Table, TableState};
 use ratatui::Frame;
 
 pub struct PlaylistPanel<'a> {
@@ -16,6 +16,7 @@ pub struct PlaylistPanel<'a> {
     playlist_name: String,
     playlist_table_rows: Vec<Row<'a>>,
     playlist_table_state: TableState,
+    scrollbar_state: ScrollbarState,
 
     // view
     playlist_table: Table<'a>,
@@ -28,6 +29,7 @@ impl<'a> PlaylistPanel<'a> {
             playlist_name: String::new(),
             playlist_table_rows: Vec::new(),
             playlist_table_state: TableState::new(),
+            scrollbar_state: ScrollbarState::new(0),
             playlist_table: Table::default(),
         }
     }
@@ -43,9 +45,6 @@ impl<'a> PlaylistPanel<'a> {
             let current_playlist = player_guard.current_playlist();
 
             self.set_model(current_playlist_name, current_playlist);
-
-            // 更新 playlist_table 的 selected，防止悬空
-            self.playlist_table_state.select(None);
         }
 
         Ok(())
@@ -67,6 +66,11 @@ impl<'a> PlaylistPanel<'a> {
                 ])
             })
             .collect();
+
+        // 更新 playlist_table 的 selected，防止悬空
+        self.playlist_table_state.select(None);
+
+        self.scrollbar_state = ScrollbarState::new(self.playlist_table_rows.len());
     }
 }
 
@@ -76,6 +80,7 @@ impl<'a> Controller for PlaylistPanel<'a> {
 
         if self.playlist_table_state.selected() == None && !self.playlist_table_rows.is_empty() {
             self.playlist_table_state.select(Some(0));
+            self.scrollbar_state.first();
             result = Ok(true);
         }
 
@@ -89,11 +94,13 @@ impl<'a> Controller for PlaylistPanel<'a> {
                 if let (Some(selected), list_len) = (self.playlist_table_state.selected(), self.playlist_table_rows.len()) {
                     if selected < list_len - 1 {
                         self.playlist_table_state.select_next();
+                        self.scrollbar_state.next();
                     }
                 }
             },
             Command::Up => {
                 self.playlist_table_state.select_previous();
+                self.scrollbar_state.prev();
             },
             Command::EnterOrPlay | Command::Play => {
                 player
@@ -105,19 +112,23 @@ impl<'a> Controller for PlaylistPanel<'a> {
             Command::WhereIsThisSong => {
                 if let Some(index) = player.lock().await.current_song_index() {
                     self.playlist_table_state.select(Some(index));
+                    self.scrollbar_state = self.scrollbar_state.position(index);
                 }
             },
             Command::GoToTop => {
                 self.playlist_table_state.select_first();
+                self.scrollbar_state.first();
             },
             Command::GoToBottom => {
                 // 使用 select_last() 会越界
                 self.playlist_table_state.select(Some(self.playlist_table_rows.len() - 1));
+                self.scrollbar_state.last();
             },
             Command::SearchForward(keywords) => {
                 if let Some(selected) = self.playlist_table_state.selected() {
                     if let Some(next_index) = player.lock().await.search_forward_playlist(selected, keywords) {
                         self.playlist_table_state.select(Some(next_index));
+                        self.scrollbar_state = self.scrollbar_state.position(next_index);
                     }
                 }
             },
@@ -125,6 +136,7 @@ impl<'a> Controller for PlaylistPanel<'a> {
                 if let Some(selected) = self.playlist_table_state.selected() {
                     if let Some(next_index) = player.lock().await.search_backward_playlist(selected, keywords) {
                         self.playlist_table_state.select(Some(next_index));
+                        self.scrollbar_state = self.scrollbar_state.position(next_index);
                     }
                 }
             },
@@ -166,5 +178,16 @@ impl<'a> Controller for PlaylistPanel<'a> {
     fn draw(&self, frame: &mut Frame, chunk: Rect) {
         let mut playlist_table_state = self.playlist_table_state.clone();
         frame.render_stateful_widget(&self.playlist_table, chunk, &mut playlist_table_state);
+
+        // 渲染 scrollbar
+        let scrollbar = Scrollbar::default()
+            .orientation(ScrollbarOrientation::VerticalRight)
+            .track_symbol(None)
+            .begin_symbol(None)
+            .end_symbol(None)
+            .thumb_style(tailwind::ROSE.c800);
+        let scrollbar_area = chunk.inner(Margin { vertical: 1, horizontal: 0 });
+        let mut scrollbar_state = self.scrollbar_state.clone();
+        frame.render_stateful_widget(scrollbar, scrollbar_area, &mut scrollbar_state);
     }
 }
