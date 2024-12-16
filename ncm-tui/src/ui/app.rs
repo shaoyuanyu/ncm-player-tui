@@ -208,6 +208,7 @@ impl<'a> App<'a> {
                 },
                 Command::GotoScreen(to_screen) => {
                     self.switch_screen(to_screen).await;
+                    self.command_line.handle_event(cmd.clone()).await?;
                 },
                 Command::EnterCommand => {
                     self.switch_to_command_line_mode();

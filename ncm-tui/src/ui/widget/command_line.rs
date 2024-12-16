@@ -1,4 +1,5 @@
-use crate::config::Command;
+use crate::config::style::*;
+use crate::config::{Command, ScreenEnum};
 use crate::ui::Controller;
 use anyhow::Result;
 use crossterm::event::KeyEvent;
@@ -6,6 +7,7 @@ use ratatui::layout::Rect;
 use ratatui::prelude::*;
 use ratatui::style::palette::tailwind;
 use ratatui::text::Line;
+use ratatui::widgets::Tabs;
 use ratatui::Frame;
 use tui_textarea::{CursorMove, TextArea};
 use unicode_width::UnicodeWidthStr;
@@ -25,6 +27,7 @@ pub struct CommandLine<'a> {
     mode_label: Line<'a>,
     colon_line: Line<'a>,
     interactive_area: TextArea<'a>,
+    tabs: Tabs<'a>,
 }
 
 ///
@@ -37,6 +40,11 @@ impl<'a> CommandLine<'a> {
             mode_label: Line::default(),
             colon_line: Line::default(),
             interactive_area: TextArea::default(),
+            tabs: Tabs::new(vec!["1.播放", "2.歌单", "0.help", "登录"])
+                .highlight_style(ITEM_SELECTED_STYLE)
+                .padding("", "")
+                .select(0)
+                .italic(),
         }
     }
 }
@@ -93,7 +101,18 @@ impl<'a> Controller for CommandLine<'a> {
         Ok(true)
     }
 
-    async fn handle_event(&mut self, _cmd: Command) -> Result<bool> {
+    async fn handle_event(&mut self, cmd: Command) -> Result<bool> {
+        self.tabs = match cmd {
+            Command::GotoScreen(to_screen) => match to_screen {
+                ScreenEnum::Main => self.tabs.to_owned().select(0),
+                ScreenEnum::Songlists => self.tabs.to_owned().select(1),
+                ScreenEnum::Help => self.tabs.to_owned().select(2),
+                ScreenEnum::Login => self.tabs.to_owned().select(3),
+                _ => self.tabs.to_owned().select(None),
+            },
+            _ => self.tabs.to_owned(),
+        };
+
         Ok(true)
     }
 
@@ -122,14 +141,12 @@ impl<'a> Controller for CommandLine<'a> {
     fn draw(&self, frame: &mut Frame, chunk: Rect) {
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints(
-                [
-                    Constraint::Length(UnicodeWidthStr::width(self.current_mode.as_str()) as u16),
-                    Constraint::Max(UnicodeWidthStr::width(if self.show_colon { ": " } else { "" }) as u16),
-                    Constraint::Fill(1),
-                ]
-                .as_ref(),
-            )
+            .constraints([
+                Constraint::Length(UnicodeWidthStr::width(self.current_mode.as_str()) as u16),
+                Constraint::Max(UnicodeWidthStr::width(if self.show_colon { ": " } else { "" }) as u16),
+                Constraint::Fill(1),
+                Constraint::Max(25),
+            ])
             .split(chunk);
 
         // mode_line
@@ -140,5 +157,8 @@ impl<'a> Controller for CommandLine<'a> {
 
         // interactive_area
         frame.render_widget(&self.interactive_area, chunks[2]);
+
+        // tabs
+        frame.render_widget(&self.tabs, chunks[3]);
     }
 }

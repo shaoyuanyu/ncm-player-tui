@@ -1,6 +1,7 @@
+use crate::config::style::*;
 use crate::config::Command;
 use crate::player;
-use crate::ui::panel::{PanelFocusedStatus, ITEM_SELECTED_STYLE, LYRIC_FOCUSED_STYLE, PANEL_SELECTED_BORDER_STYLE};
+use crate::ui::panel::PanelFocusedStatus;
 use crate::ui::Controller;
 use ncm_api::model::Song;
 use ratatui::layout::Rect;
