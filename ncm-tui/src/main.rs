@@ -28,6 +28,7 @@ lazy_static! {
         path_config.api_program.clone(),
         path_config.login_cookie.clone(),
         path_config.lyrics.clone(),
+        path_config.settings.clone(),
     )));
     static ref player: Arc<Mutex<Player>> = Arc::new(Mutex::new(Player::new()));
     static ref command_queue: Arc<Mutex<VecDeque<Command>>> = Arc::new(Mutex::new(VecDeque::new()));
@@ -36,6 +37,8 @@ lazy_static! {
 #[tokio::main]
 async fn main() -> Result<()> {
     env_logger::init();
+
+    ncm_client.lock().await.init();
 
     let app = Arc::new(Mutex::new(App::new(create_terminal()?)));
 

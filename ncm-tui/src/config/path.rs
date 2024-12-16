@@ -12,6 +12,7 @@ pub struct Path {
 
     // 二级目录
     pub api_program: PathBuf,
+    pub settings: PathBuf,
     pub login_cookie: PathBuf,
     pub lyrics: PathBuf,
 }
@@ -35,6 +36,8 @@ impl Path {
 
         let api_program = data.clone().join("neteasecloudmusicapi");
 
+        let settings = data.clone().join("settings.json");
+
         let login_cookie = data.clone().join("cookies");
 
         let lyrics = cache.clone().join("lyrics");
@@ -47,6 +50,7 @@ impl Path {
             config,
             cache,
             api_program,
+            settings,
             login_cookie,
             lyrics,
         }
