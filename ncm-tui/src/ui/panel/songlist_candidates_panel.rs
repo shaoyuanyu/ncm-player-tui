@@ -69,7 +69,7 @@ impl<'a> Controller for SonglistsPanel<'a> {
                     Row::from_iter(vec![
                         Cell::new(songlist.name.clone()),
                         Cell::new(songlist.creator.clone()),
-                        Cell::new(songlist.songs_count.clone().to_string()),
+                        Cell::new(format!("{:>6}", songlist.songs_count)),
                     ])
                 })
                 .collect();
