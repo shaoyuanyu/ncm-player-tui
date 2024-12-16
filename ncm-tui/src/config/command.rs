@@ -43,7 +43,7 @@ impl Command {
             Some("q" | "quit" | "exit") => Ok(Self::Quit),
             Some("screen") => match tokens.next() {
                 Some("1" | "main") => Ok(Self::GotoScreen(ScreenEnum::Main)),
-                Some("2" | "playlist" | "playlists") => Ok(Self::GotoScreen(ScreenEnum::Playlists)),
+                Some("2" | "playlist" | "playlists") => Ok(Self::GotoScreen(ScreenEnum::Songlists)),
                 Some("0" | "help") => Ok(Self::GotoScreen(ScreenEnum::Help)),
                 Some(other) => Err(anyhow!("screen: Invalid screen identifier: {}", other)),
                 None => Err(anyhow!("screen: Missing argument SCREEN_ID")),

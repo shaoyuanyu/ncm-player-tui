@@ -9,7 +9,7 @@ pub enum AppMode {
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Copy)]
 pub enum ScreenEnum {
     Main,
-    Playlists,
+    Songlists,
     Login,
     Help,
     Launch,

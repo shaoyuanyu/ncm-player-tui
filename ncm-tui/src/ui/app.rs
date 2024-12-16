@@ -28,7 +28,7 @@ pub struct App<'a> {
 
     // view
     main_screen: MainScreen<'a>,
-    playlists_screen: PlaylistsScreen<'a>,
+    songlists_screen: SonglistsScreen<'a>,
     login_screen: LoginScreen<'a>,
     help_screen: HelpScreen<'a>,
     command_line: CommandLine<'a>,
@@ -49,7 +49,7 @@ impl<'a> App<'a> {
             current_mode: AppMode::Normal,
             need_re_update_view: true,
             main_screen: MainScreen::new(&normal_style),
-            playlists_screen: PlaylistsScreen::new(&normal_style),
+            songlists_screen: SonglistsScreen::new(&normal_style),
             login_screen: LoginScreen::new(&normal_style),
             help_screen: HelpScreen::new(&normal_style),
             command_line: CommandLine::new(),
@@ -124,7 +124,7 @@ impl<'a> App<'a> {
             ScreenEnum::Help => false,
             ScreenEnum::Login => self.update_login_model().await?,
             ScreenEnum::Main => self.main_screen.update_model().await?,
-            ScreenEnum::Playlists => self.playlists_screen.update_model().await?,
+            ScreenEnum::Songlists => self.songlists_screen.update_model().await?,
             _ => false,
         };
 
@@ -268,7 +268,7 @@ impl<'a> App<'a> {
                 // 若写成 self.need_re_update_view = self.need_re_update_view || match ... {} ，match块内的方法可能不被执行
                 self.need_re_update_view = match self.current_screen {
                     ScreenEnum::Main => self.main_screen.handle_event(cmd).await?,
-                    ScreenEnum::Playlists => self.playlists_screen.handle_event(cmd).await?,
+                    ScreenEnum::Songlists => self.songlists_screen.handle_event(cmd).await?,
                     ScreenEnum::Login => self.login_screen.handle_event(cmd).await?,
                     ScreenEnum::Help => self.help_screen.handle_event(cmd).await?,
                     _ => false,
@@ -286,7 +286,7 @@ impl<'a> App<'a> {
                 ScreenEnum::Help => {},
                 ScreenEnum::Login => self.login_screen.update_view(&self.normal_style),
                 ScreenEnum::Main => self.main_screen.update_view(&self.normal_style),
-                ScreenEnum::Playlists => self.playlists_screen.update_view(&self.normal_style),
+                ScreenEnum::Songlists => self.songlists_screen.update_view(&self.normal_style),
                 _ => {},
             }
         }
@@ -319,7 +319,7 @@ impl<'a> App<'a> {
                 ScreenEnum::Help => self.help_screen.draw(frame, chunks[0]),
                 ScreenEnum::Login => self.login_screen.draw(frame, chunks[0]),
                 ScreenEnum::Main => self.main_screen.draw(frame, chunks[0]),
-                ScreenEnum::Playlists => self.playlists_screen.draw(frame, chunks[0]),
+                ScreenEnum::Songlists => self.songlists_screen.draw(frame, chunks[0]),
                 _ => {},
             }
 
@@ -356,7 +356,7 @@ impl<'a> App<'a> {
             KeyCode::Left => Command::PrevPanel,
             KeyCode::Char('h') => Command::PrevPanel,
             KeyCode::Char('1') => Command::GotoScreen(ScreenEnum::Main),
-            KeyCode::Char('2') => Command::GotoScreen(ScreenEnum::Playlists),
+            KeyCode::Char('2') => Command::GotoScreen(ScreenEnum::Songlists),
             KeyCode::Char('0') => Command::GotoScreen(ScreenEnum::Help),
             KeyCode::F(1) => Command::GotoScreen(ScreenEnum::Help),
             KeyCode::Char('.') | KeyCode::Char('。') => Command::NextSong,
@@ -456,8 +456,8 @@ impl<'a> App<'a> {
             ScreenEnum::Login => {
                 self.login_screen = LoginScreen::new(&self.normal_style);
             },
-            ScreenEnum::Playlists => {
-                self.playlists_screen = PlaylistsScreen::new(&self.normal_style);
+            ScreenEnum::Songlists => {
+                self.songlists_screen = SonglistsScreen::new(&self.normal_style);
             },
             _ => {},
         }

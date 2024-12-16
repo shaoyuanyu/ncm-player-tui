@@ -21,7 +21,7 @@ pub struct Player {
     //
     volume: f64,
     //
-    playlist_candidates: Vec<Songlist>,
+    songlists: Vec<Songlist>,
     //
     current_playlist_name: String,
     current_playlist: Vec<Song>, // TODO: 优化为指针
@@ -55,7 +55,7 @@ impl Player {
             play_state: PlayState::Stopped,
             play_mode: PlayMode::Shuffle,
             volume,
-            playlist_candidates: Vec::new(),
+            songlists: Vec::new(),
             current_playlist_name: String::new(),
             current_playlist: Vec::new(),
             play_index_history_stack: Vec::new(),
@@ -132,12 +132,12 @@ impl Player {
         self.current_lyric_line_index
     }
 
-    pub fn set_playlist_candidates(&mut self, candidates: Vec<Songlist>) {
-        self.playlist_candidates = candidates;
+    pub fn set_songlists(&mut self, songlists: Vec<Songlist>) {
+        self.songlists = songlists;
     }
 
-    pub fn playlist_candidates(&self) -> &Vec<Songlist> {
-        &self.playlist_candidates
+    pub fn songlists(&self) -> &Vec<Songlist> {
+        &self.songlists
     }
 }
 
@@ -145,7 +145,7 @@ impl Player {
 impl Player {
     /// 切换播放列表
     pub async fn switch_playlist<'c>(&mut self, playlist_candidate_index: usize, ncm_client_guard: MutexGuard<'c, NcmClient>) -> Result<()> {
-        if let Some(songlist) = self.playlist_candidates.get_mut(playlist_candidate_index) {
+        if let Some(songlist) = self.songlists.get_mut(playlist_candidate_index) {
             debug!("{:?}", songlist);
 
             //

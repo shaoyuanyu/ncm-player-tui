@@ -1,10 +1,10 @@
 mod lyric_panel;
-mod playlist_candidate_panel;
 mod playlist_panel;
+mod songlist_candidates_panel;
 
 pub use lyric_panel::*;
-pub use playlist_candidate_panel::*;
 pub use playlist_panel::*;
+pub use songlist_candidates_panel::*;
 
 use ratatui::prelude::{Modifier, Style};
 use ratatui::style::palette::tailwind;
