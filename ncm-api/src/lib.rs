@@ -1,8 +1,10 @@
 pub mod model;
 mod responses;
+mod settings;
 
 use crate::model::{Account, FromJson, LyricLine, Lyrics, Song, Songlist};
 use crate::responses::login::*;
+use crate::settings::Settings;
 use anyhow::{anyhow, Result};
 use chrono::Utc;
 use log::{debug, error};
@@ -19,29 +21,113 @@ pub struct NcmClient {
     api_program_path: PathBuf,
     cookie_path: PathBuf,
     lyrics_path: PathBuf,
+    settings_path: PathBuf,
+
     api_child_process: Option<process::Child>,
     http_client: Client,
-    local_api_url: String,
+    api_url: String,
     cookie: String,
+    settings: Settings,
+
     login_account: Option<Account>,
 }
 
 impl NcmClient {
-    pub fn new(api_program_path: PathBuf, cookie_path: PathBuf, lyrics_path: PathBuf) -> Self {
+    pub fn new(api_program_path: PathBuf, cookie_path: PathBuf, lyrics_path: PathBuf, settings_path: PathBuf) -> Self {
         Self {
             api_program_path,
             cookie_path,
             lyrics_path,
+            settings_path,
             api_child_process: None,
-            local_api_url: String::from("http://localhost:3000"),
+            api_url: String::new(),
             http_client: ClientBuilder::new().no_proxy().build().expect("failed to build HTTP client"),
             cookie: String::new(),
+            settings: Settings::default(),
             login_account: None,
         }
     }
 
-    /// 将 nodejs 编写的 api 程序作为子进程启动，输出重定向到 stderr
+    /// 初始化，尝试读取本地设置文件
+    pub fn init(&mut self) {
+        self.settings = self.read_settings();
+
+        // 更新（应对本地无设置文件或Settings数据结构更新的情况）
+        self.store_settings();
+    }
+
+    /// 读取设置（读不到则返回默认设置）
+    fn read_settings(&mut self) -> Settings {
+        let mut settings = Settings::default();
+
+        match File::open(&self.settings_path) {
+            Ok(mut settings_file) => {
+                let mut settings_json = String::new();
+                if matches!(settings_file.read_to_string(&mut settings_json), Ok(_)) {
+                    match serde_json::from_str(&settings_json) {
+                        Ok(s) => {
+                            settings = s;
+                            debug!("read settings: {:?}", settings);
+                        },
+                        Err(err) => error!("failed to serialize settings from json: {:?}", err),
+                    }
+                }
+            },
+            Err(err) => error!("failed to read settings file, try to generate one later: {:?}", err),
+        }
+
+        settings
+    }
+
+    /// 保存设置
+    pub fn store_settings(&mut self) {
+        match serde_json::to_string_pretty(&self.settings) {
+            Ok(settings_json) => match fs::OpenOptions::new().write(true).create(true).truncate(true).open(&self.settings_path) {
+                Ok(mut settings_file) => match settings_file.write_all(settings_json.as_bytes()) {
+                    Ok(_) => debug!("settings stored: {}", settings_json),
+                    Err(err) => error!("failed to store settings {:?}", err),
+                },
+                Err(err) => error!("{:?}", err),
+            },
+            Err(err) => error!("failed to serialize settings from json: {:?}", err),
+        }
+    }
+
+    /// 支持 local api 和 remote api
+    ///
+    /// local api 依赖本地 `~/.local/share/ncm-tui-player/neteasecloudmusicapi/` 的程序
+    ///
+    /// remote api 依赖部署在服务器的 `neteasecloudmusicapi` 程序
     pub async fn check_api(&mut self) -> bool {
+        if self.settings.use_remote_api {
+            self.check_remote_api().await
+        } else {
+            self.check_local_api().await
+        }
+    }
+
+    /// 检查与 remote api 的连接性
+    ///
+    /// 若失败则会尝试 local api
+    async fn check_remote_api(&mut self) -> bool {
+        self.api_url = self.settings.remote_api_url.clone();
+
+        if let Ok(response) = self.http_client.get(&self.api_url).send().await {
+            if response.status().is_success() {
+                debug!("api check passed");
+                return true;
+            }
+        }
+
+        self.check_local_api().await
+    }
+
+    /// 启动本地 api 程序，并检查连接性
+    ///
+    /// 将 nodejs 编写的 api 程序作为子进程启动，输出重定向到 stderr
+    async fn check_local_api(&mut self) -> bool {
+        self.api_url = String::from("http://localhost:3000");
+
         let api_program_path = self.api_program_path.to_str().unwrap();
 
         let api_child_process: process::Child = process::Command::new("sh")
@@ -55,7 +141,7 @@ impl NcmClient {
         for _ in 0..30 {
             tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
-            if let Ok(response) = self.http_client.get(&self.local_api_url).send().await {
+            if let Ok(response) = self.http_client.get(&self.api_url).send().await {
                 if response.status().is_success() {
                     debug!("api check passed");
                     return true;
@@ -123,7 +209,7 @@ impl NcmClient {
     pub async fn get_login_qr(&self) -> Result<(String, String)> {
         let key_response = self
             .http_client
-            .get(format!("{}/login/qr/key?timestamp={}", &self.local_api_url, Utc::now().timestamp()))
+            .get(format!("{}/login/qr/key?timestamp={}", &self.api_url, Utc::now().timestamp()))
             .send()
             .await?
             .json::<QrResponse<QrKeyData>>()
@@ -134,7 +220,7 @@ impl NcmClient {
 
             let create_response = self
                 .http_client
-                .get(format!("{}/login/qr/create?key={}&qrimg=true&timestamp={}", &self.local_api_url, &uni_key, Utc::now().timestamp()))
+                .get(format!("{}/login/qr/create?key={}&qrimg=true&timestamp={}", &self.api_url, &uni_key, Utc::now().timestamp()))
                 .send()
                 .await?
                 .json::<QrResponse<QrCreateData>>()
@@ -155,7 +241,7 @@ impl NcmClient {
     pub async fn check_login_qr(&mut self, uni_key: &str) -> Result<usize> {
         let check_response = self
             .http_client
-            .get(format!("{}/login/qr/check?key={}&timestamp={}", &self.local_api_url, &uni_key, Utc::now().timestamp()))
+            .get(format!("{}/login/qr/check?key={}&timestamp={}", &self.api_url, &uni_key, Utc::now().timestamp()))
             .send()
             .await?
             .json::<QrCheckResponse>()
@@ -175,7 +261,7 @@ impl NcmClient {
     pub async fn check_login_status(&mut self) -> Result<()> {
         let status_response = self
             .http_client
-            .post(format!("{}/login/status", &self.local_api_url))
+            .post(format!("{}/login/status", &self.api_url))
             .form(&[("cookie", &self.cookie)])
             .send()
             .await?
@@ -229,7 +315,7 @@ impl NcmClient {
 
             let playlist_response = self
                 .http_client
-                .post(format!("{}/user/playlist?uid={}", &self.local_api_url, user_id))
+                .post(format!("{}/user/playlist?uid={}", &self.api_url, user_id))
                 .form(&[("cookie", &self.cookie)])
                 .send()
                 .await?;
@@ -274,7 +360,7 @@ impl NcmClient {
         while songlist.songs.len() % 1000 == 0 {
             let playlist_detail_response = self
                 .http_client
-                .post(format!("{}/playlist/track/all?id={}&limit=1000&offset={}", &self.local_api_url, songlist.id, offset))
+                .post(format!("{}/playlist/track/all?id={}&limit=1000&offset={}", &self.api_url, songlist.id, offset))
                 .form(&[("cookie", &self.cookie)])
                 .send()
                 .await?;
@@ -321,7 +407,7 @@ impl NcmClient {
     pub async fn check_song_availability(&self, song_id: u64) -> Result<bool> {
         let check_response = self
             .http_client
-            .post(format!("{}/check/music?id={}", &self.local_api_url, song_id))
+            .post(format!("{}/check/music?id={}", &self.api_url, song_id))
             .form(&[("cookie", &self.cookie)])
             .send()
             .await?;
@@ -341,7 +427,7 @@ impl NcmClient {
 
         let song_url_response = self
             .http_client
-            .post(format!("{}/song/url/v1?id={}&level={}", &self.local_api_url, song.id, "jymaster"))
+            .post(format!("{}/song/url/v1?id={}&level={}", &self.api_url, song.id, "jymaster"))
             .form(&[("cookie", &self.cookie)])
             .send()
             .await?;
@@ -378,7 +464,7 @@ impl NcmClient {
 
         let lyric_response = self
             .http_client
-            .post(format!("{}/lyric?id={}", &self.local_api_url, song_id))
+            .post(format!("{}/lyric?id={}", &self.api_url, song_id))
             .form(&[("cookie", &self.cookie)])
             .send()
             .await?;
@@ -416,7 +502,7 @@ impl NcmClient {
                 Ok(mut lyrics_file) => match lyrics_file.write_all(lyrics_json.as_bytes()) {
                     Ok(_) => debug!("lyrics stored at {:?}", &self.lyrics_path),
                     Err(err) => {
-                        error!("failed to store lyrics at {:?}: {}", &self.lyrics_path, err)
+                        error!("failed to store lyrics at {:?}: {:?}", &self.lyrics_path, err)
                     },
                 },
                 Err(err) => error!("{:?}", err),
