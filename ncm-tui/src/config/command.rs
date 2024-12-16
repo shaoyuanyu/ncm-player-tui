@@ -58,7 +58,7 @@ impl Command {
                     } else {
                         Err(anyhow!("volume: Invalid argument NUMBER"))
                     }
-                }
+                },
                 None => Err(anyhow!("volume: Missing argument NUMBER")),
             },
             Some("mute") => Ok(Self::SetVolume(0.0)),
@@ -86,14 +86,14 @@ impl Command {
                     keywords.push(keyword.to_string());
                 }
                 Ok(Self::SearchForward(keywords))
-            }
+            },
             Some("?") => {
                 let mut keywords = Vec::new();
                 while let Some(keyword) = tokens.next() {
                     keywords.push(keyword.to_string());
                 }
                 Ok(Self::SearchBackward(keywords))
-            }
+            },
             Some(other) => Err(anyhow!("Invalid command: {}", other)),
             None => Ok(Self::Nop),
         }

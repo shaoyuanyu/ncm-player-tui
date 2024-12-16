@@ -63,11 +63,7 @@ impl<'a> PlaylistPanel<'a> {
                     Cell::new(song.name.clone()),
                     Cell::new(song.singer.clone()),
                     Cell::new(song.album.clone()),
-                    Cell::new(format!(
-                        "{:02}:{:02}",
-                        song.duration.clone() / 60000,
-                        song.duration.clone() % 60000 / 1000
-                    )),
+                    Cell::new(format!("{:02}:{:02}", song.duration.clone() / 60000, song.duration.clone() % 60000 / 1000)),
                 ])
             })
             .collect();
@@ -90,67 +86,52 @@ impl<'a> Controller for PlaylistPanel<'a> {
         match cmd {
             Command::Down => {
                 // 直接使用 select_next() 存在越界问题
-                if let (Some(selected), list_len) = (
-                    self.playlist_table_state.selected(),
-                    self.playlist_table_rows.len(),
-                ) {
+                if let (Some(selected), list_len) = (self.playlist_table_state.selected(), self.playlist_table_rows.len()) {
                     if selected < list_len - 1 {
                         self.playlist_table_state.select_next();
                     }
                 }
-            }
+            },
             Command::Up => {
                 self.playlist_table_state.select_previous();
-            }
+            },
             Command::EnterOrPlay | Command::Play => {
                 player
                     .lock()
                     .await
-                    .play_particularly_now(
-                        self.playlist_table_state.selected().unwrap_or(0),
-                        ncm_client.lock().await,
-                    )
+                    .play_particularly_now(self.playlist_table_state.selected().unwrap_or(0), ncm_client.lock().await)
                     .await?;
-            }
+            },
             Command::WhereIsThisSong => {
                 if let Some(index) = player.lock().await.current_song_index() {
                     self.playlist_table_state.select(Some(index));
                 }
-            }
+            },
             Command::GoToTop => {
                 self.playlist_table_state.select_first();
-            }
+            },
             Command::GoToBottom => {
                 // 使用 select_last() 会越界
-                self.playlist_table_state
-                    .select(Some(self.playlist_table_rows.len() - 1));
-            }
+                self.playlist_table_state.select(Some(self.playlist_table_rows.len() - 1));
+            },
             Command::SearchForward(keywords) => {
                 if let Some(selected) = self.playlist_table_state.selected() {
-                    if let Some(next_index) = player
-                        .lock()
-                        .await
-                        .search_forward_playlist(selected, keywords)
-                    {
+                    if let Some(next_index) = player.lock().await.search_forward_playlist(selected, keywords) {
                         self.playlist_table_state.select(Some(next_index));
                     }
                 }
-            }
+            },
             Command::SearchBackward(keywords) => {
                 if let Some(selected) = self.playlist_table_state.selected() {
-                    if let Some(next_index) = player
-                        .lock()
-                        .await
-                        .search_backward_playlist(selected, keywords)
-                    {
+                    if let Some(next_index) = player.lock().await.search_backward_playlist(selected, keywords) {
                         self.playlist_table_state.select(Some(next_index));
                     }
                 }
-            }
+            },
             Command::RefreshPlaylist => {
                 self.update_model_by_current_playlist().await?;
-            }
-            _ => {}
+            },
+            _ => {},
         }
 
         Ok(true)
@@ -159,41 +140,24 @@ impl<'a> Controller for PlaylistPanel<'a> {
     fn update_view(&mut self, _style: &Style) {
         let header_style = Style::default().fg(tailwind::WHITE).bg(tailwind::RED.c300);
 
-        let mut playlist_table = Table::new(
-            self.playlist_table_rows.clone(),
-            [
-                Constraint::Min(40),
-                Constraint::Min(15),
-                Constraint::Min(15),
-                Constraint::Length(6),
-            ],
-        )
-        .header(
-            Row::new(vec![
-                Cell::new("曲名"),
-                Cell::new("歌手/乐手"),
-                Cell::new("专辑"),
-                Cell::new("时长"),
-            ])
-            .style(header_style)
-            .height(1),
-        )
-        .block({
-            let mut block = Block::default()
-                .title(format!("Playlist: {}\u{1F4DC}", self.playlist_name.clone()))
-                .borders(Borders::ALL);
-            if self.focused_status == PanelFocusedStatus::Outside {
-                block = block.border_style(PANEL_SELECTED_BORDER_STYLE);
-            }
+        let mut playlist_table = Table::new(self.playlist_table_rows.clone(), [Constraint::Min(40), Constraint::Min(15), Constraint::Min(15), Constraint::Length(6)])
+            .header(
+                Row::new(vec![Cell::new("曲名"), Cell::new("歌手/乐手"), Cell::new("专辑"), Cell::new("时长")])
+                    .style(header_style)
+                    .height(1),
+            )
+            .block({
+                let mut block = Block::default().title(format!("Playlist: {}\u{1F4DC}", self.playlist_name.clone())).borders(Borders::ALL);
+                if self.focused_status == PanelFocusedStatus::Outside {
+                    block = block.border_style(PANEL_SELECTED_BORDER_STYLE);
+                }
 
-            block
-        });
+                block
+            });
 
         // highlight
         if self.focused_status == PanelFocusedStatus::Inside {
-            playlist_table = playlist_table
-                .row_highlight_style(ITEM_SELECTED_STYLE)
-                .highlight_symbol(">")
+            playlist_table = playlist_table.row_highlight_style(ITEM_SELECTED_STYLE).highlight_symbol(">")
         }
 
         self.playlist_table = playlist_table;

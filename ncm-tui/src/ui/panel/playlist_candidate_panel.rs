@@ -1,7 +1,5 @@
 use crate::config::Command;
-use crate::ui::panel::{
-    PanelFocusedStatus, ITEM_SELECTED_STYLE, PANEL_SELECTED_BORDER_STYLE, TABLE_HEADER_STYLE,
-};
+use crate::ui::panel::{PanelFocusedStatus, ITEM_SELECTED_STYLE, PANEL_SELECTED_BORDER_STYLE, TABLE_HEADER_STYLE};
 use crate::ui::Controller;
 use crate::{ncm_client, player};
 use ncm_api::model::Songlist;
@@ -96,66 +94,49 @@ impl<'a> Controller for PlaylistCandidatePanel<'a> {
         match cmd {
             Command::Down => {
                 // 直接使用 select_next() 存在越界问题
-                if let (Some(selected), list_len) = (
-                    self.playlists_table_state.selected(),
-                    self.playlists_table_rows.len(),
-                ) {
+                if let (Some(selected), list_len) = (self.playlists_table_state.selected(), self.playlists_table_rows.len()) {
                     if selected + 1 < list_len {
                         self.playlists_table_state.select_next();
                     }
                 }
-            }
+            },
             Command::Up => {
                 self.playlists_table_state.select_previous();
-            }
-            Command::EnterOrPlay => {}
+            },
+            Command::EnterOrPlay => {},
             Command::GoToTop => {
                 self.playlists_table_state.select_first();
-            }
+            },
             Command::GoToBottom => {
                 // 使用 select_last() 会越界
-                self.playlists_table_state
-                    .select(Some(self.playlists_table_rows.len() - 1));
-            }
-            Command::SearchForward(_) => {}
-            Command::SearchBackward(_) => {}
-            _ => {}
+                self.playlists_table_state.select(Some(self.playlists_table_rows.len() - 1));
+            },
+            Command::SearchForward(_) => {},
+            Command::SearchBackward(_) => {},
+            _ => {},
         }
 
         Ok(true)
     }
 
     fn update_view(&mut self, _style: &Style) {
-        let mut playlists_table = Table::new(
-            self.playlists_table_rows.clone(),
-            [Constraint::Min(30), Constraint::Min(10), Constraint::Max(6)],
-        )
-        .header(
-            Row::new(vec![
-                Cell::new("歌单"),
-                Cell::new("创建者"),
-                Cell::new("歌曲数"),
-            ])
-            .style(TABLE_HEADER_STYLE)
-            .height(1),
-        )
-        .block({
-            let mut block = Block::default()
-                .title(Line::from(format!("{}收藏的歌单", self.username)))
-                .title_bottom(Line::from("按下`Alt+Enter`开始播放选中歌单").centered())
-                .borders(Borders::ALL);
-            if self.focused_status == PanelFocusedStatus::Outside {
-                block = block.border_style(PANEL_SELECTED_BORDER_STYLE);
-            }
+        let mut playlists_table = Table::new(self.playlists_table_rows.clone(), [Constraint::Min(30), Constraint::Min(10), Constraint::Max(6)])
+            .header(Row::new(vec![Cell::new("歌单"), Cell::new("创建者"), Cell::new("歌曲数")]).style(TABLE_HEADER_STYLE).height(1))
+            .block({
+                let mut block = Block::default()
+                    .title(Line::from(format!("{}收藏的歌单", self.username)))
+                    .title_bottom(Line::from("按下`Alt+Enter`开始播放选中歌单").centered())
+                    .borders(Borders::ALL);
+                if self.focused_status == PanelFocusedStatus::Outside {
+                    block = block.border_style(PANEL_SELECTED_BORDER_STYLE);
+                }
 
-            block
-        });
+                block
+            });
 
         // highlight
         if self.focused_status == PanelFocusedStatus::Inside {
-            playlists_table = playlists_table
-                .row_highlight_style(ITEM_SELECTED_STYLE)
-                .highlight_symbol(">")
+            playlists_table = playlists_table.row_highlight_style(ITEM_SELECTED_STYLE).highlight_symbol(">")
         }
 
         self.playlists_table = playlists_table;

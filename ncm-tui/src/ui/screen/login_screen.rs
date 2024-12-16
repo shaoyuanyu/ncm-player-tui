@@ -16,8 +16,8 @@ pub struct LoginScreen<'a> {
     login_qr_lines: Vec<Line<'a>>, // 登录二维码（按行）
     login_qr_status_code: usize,   // 登录二维码状态码
     login_qr_status: String,       // 登录二维码状态
-    is_login_ok_refreshed: bool, // 标志控制位，控制登录完成后第一次 update_model 更新“登录成功”的信息，第二次 update_model 才进行 cookie 保存等高延迟操作
-    tick_tok: usize, // 时钟记录，0~3，用于在状态显示后增加动态省略号，也用于控制发送检查二维码请求的频率
+    is_login_ok_refreshed: bool,   // 标志控制位，控制登录完成后第一次 update_model 更新“登录成功”的信息，第二次 update_model 才进行 cookie 保存等高延迟操作
+    tick_tok: usize,               // 时钟记录，0~3，用于在状态显示后增加动态省略号，也用于控制发送检查二维码请求的频率
 
     // view
     login_page: Paragraph<'a>,
@@ -50,11 +50,7 @@ impl<'a> LoginScreen<'a> {
         self.login_url = qr_url;
         let qrcode = QRBuilder::new(self.login_url.clone()).build()?.to_str();
         // self.login_qrcode = qrcode.clone();
-        self.login_qr_lines = qrcode
-            .split('\n')
-            .into_iter()
-            .map(|s| Line::from(s.to_owned()).centered())
-            .collect();
+        self.login_qr_lines = qrcode.split('\n').into_iter().map(|s| Line::from(s.to_owned()).centered()).collect();
         self.is_login_ok_refreshed = false;
 
         Ok(())
@@ -80,9 +76,7 @@ impl<'a> Controller for LoginScreen<'a> {
             let mut ncm_client_guard = ncm_client.lock().await;
 
             // 检查二维码状态并更新
-            self.login_qr_status_code = ncm_client_guard
-                .check_login_qr(self.login_unikey.as_str())
-                .await?;
+            self.login_qr_status_code = ncm_client_guard.check_login_qr(self.login_unikey.as_str()).await?;
 
             self.login_qr_status = match self.login_qr_status_code {
                 800 => String::from("二维码已过期，请稍等"),
@@ -133,18 +127,8 @@ impl<'a> Controller for LoginScreen<'a> {
             .block(
                 Block::default()
                     .title(Line::from("Netease Cloud Music - QR Code Login").left_aligned())
-                    .title(
-                        Line::from(format!(
-                            "{}{}",
-                            self.login_qr_status.clone(),
-                            ".".repeat(self.tick_tok)
-                        ))
-                        .right_aligned(),
-                    )
-                    .title_bottom(
-                        Line::from("如果无法识别二维码，可将终端背景色改为深色后再尝试")
-                            .right_aligned(),
-                    )
+                    .title(Line::from(format!("{}{}", self.login_qr_status.clone(), ".".repeat(self.tick_tok))).right_aligned())
+                    .title_bottom(Line::from("如果无法识别二维码，可将终端背景色改为深色后再尝试").right_aligned())
                     .borders(Borders::ALL),
             )
             .style(*style);

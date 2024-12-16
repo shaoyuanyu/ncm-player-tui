@@ -43,37 +43,23 @@ async fn main() -> Result<()> {
     app.lock().await.draw_launch_screen()?;
 
     // 创建 NCM_API 时会默认尝试 cookie 登录，在新线程中检查 cookie 状态并初始化
-    let app2 = Arc::clone(&app);
+    let app_2 = Arc::clone(&app);
     let ncm_client_2 = Arc::clone(&ncm_client);
     task::spawn(async move {
         sleep(Duration::from_secs(1)).await; // 给启动帧留缓冲
 
         if ncm_client_2.lock().await.check_api().await {
-            if ncm_client_2
-                .lock()
-                .await
-                .try_cookie_login()
-                .await
-                .unwrap_or(false)
-            {
-                app2.lock()
-                    .await
-                    .init_after_login()
-                    .await
-                    .expect("Couldn't initialize application");
+            if ncm_client_2.lock().await.try_cookie_login().await.unwrap_or(false) {
+                app_2.lock().await.init_after_login().await.expect("Couldn't initialize application");
             } else {
-                app2.lock().await.init_after_no_login().await;
+                app_2.lock().await.init_after_no_login().await;
             }
         }
     });
 
     loop {
         // 检查播放情况
-        player
-            .lock()
-            .await
-            .auto_play(ncm_client.lock().await)
-            .await?;
+        player.lock().await.auto_play(ncm_client.lock().await).await?;
 
         // 根据 Controller 流程，先执行 update_model()，再执行 handle_event()
         app.lock().await.update_model().await?;

@@ -1,8 +1,6 @@
 use crate::config::Command;
 use crate::player;
-use crate::ui::panel::{
-    PanelFocusedStatus, ITEM_SELECTED_STYLE, LYRIC_FOCUSED_STYLE, PANEL_SELECTED_BORDER_STYLE,
-};
+use crate::ui::panel::{PanelFocusedStatus, ITEM_SELECTED_STYLE, LYRIC_FOCUSED_STYLE, PANEL_SELECTED_BORDER_STYLE};
 use crate::ui::Controller;
 use ncm_api::model::Song;
 use ratatui::layout::Rect;
@@ -49,10 +47,8 @@ impl<'a> Controller for LyricPanel<'a> {
             // 聚焦不在 LyricInside 时，自动更新当前歌词行
             // 聚焦在 LyricInside 时，根据用户选择选中歌词行
             if self.focused_status != PanelFocusedStatus::Inside {
-                if self.song_lyric_list_state.selected() != player_guard.current_lyric_line_index()
-                {
-                    self.song_lyric_list_state
-                        .select(player_guard.current_lyric_line_index());
+                if self.song_lyric_list_state.selected() != player_guard.current_lyric_line_index() {
+                    self.song_lyric_list_state.select(player_guard.current_lyric_line_index());
 
                     result = Ok(true);
                 }
@@ -81,9 +77,7 @@ impl<'a> Controller for LyricPanel<'a> {
             } else {
                 // 无歌词（纯音乐或网络异常）
                 self.song_lyric_list_items = Vec::new();
-                self.song_lyric_list_items.push(ListItem::new(Text::from(
-                    Line::from("无歌词，请欣赏").centered(),
-                )));
+                self.song_lyric_list_items.push(ListItem::new(Text::from(Line::from("无歌词，请欣赏").centered())));
             }
 
             // 更新 song_ui selected，防止悬空
@@ -104,36 +98,28 @@ impl<'a> Controller for LyricPanel<'a> {
         match cmd {
             Command::Down => {
                 // 直接使用 select_next() 存在越界问题
-                if let (Some(selected), list_len) = (
-                    self.song_lyric_list_state.selected(),
-                    self.song_lyric_list_items.len(),
-                ) {
+                if let (Some(selected), list_len) = (self.song_lyric_list_state.selected(), self.song_lyric_list_items.len()) {
                     if selected < list_len - 1 {
                         self.song_lyric_list_state.select_next();
                     }
                 }
-            }
+            },
             Command::Up => {
                 self.song_lyric_list_state.select_previous();
-            }
+            },
             Command::EnterOrPlay | Command::Play => {
                 // 跳转到对应编号的时间戳处播放
                 let index = self.song_lyric_list_state.selected().unwrap_or(0);
-                player
-                    .lock()
-                    .await
-                    .seek_to_timestamp_with_index(index)
-                    .await?;
-            }
+                player.lock().await.seek_to_timestamp_with_index(index).await?;
+            },
             Command::GoToTop => {
                 self.song_lyric_list_state.select_first();
-            }
+            },
             Command::GoToBottom => {
                 // 使用 select_last() 会越界
-                self.song_lyric_list_state
-                    .select(Some(self.song_lyric_list_items.len() - 1));
-            }
-            _ => {}
+                self.song_lyric_list_state.select(Some(self.song_lyric_list_items.len() - 1));
+            },
+            _ => {},
         }
 
         Ok(true)
@@ -157,9 +143,7 @@ impl<'a> Controller for LyricPanel<'a> {
                 block
             }),
             None => song_lyric_list.block({
-                let mut block = Block::default()
-                    .title("\u{1F3B6}pick a song to play".to_string())
-                    .borders(Borders::ALL);
+                let mut block = Block::default().title("\u{1F3B6}pick a song to play".to_string()).borders(Borders::ALL);
                 if self.focused_status == PanelFocusedStatus::Outside {
                     block = block.border_style(PANEL_SELECTED_BORDER_STYLE);
                 }
@@ -172,9 +156,7 @@ impl<'a> Controller for LyricPanel<'a> {
         song_lyric_list = if self.focused_status == PanelFocusedStatus::Inside {
             song_lyric_list.highlight_style(ITEM_SELECTED_STYLE)
         } else {
-            song_lyric_list
-                .highlight_style(LYRIC_FOCUSED_STYLE)
-                .highlight_spacing(HighlightSpacing::WhenSelected)
+            song_lyric_list.highlight_style(LYRIC_FOCUSED_STYLE).highlight_spacing(HighlightSpacing::WhenSelected)
         };
 
         self.song_lyric_list = song_lyric_list;
@@ -184,10 +166,7 @@ impl<'a> Controller for LyricPanel<'a> {
         let mut song_lyric_list_state = self.song_lyric_list_state.clone();
 
         // 歌词居中
-        self.correct_offset_to_make_lyric_centered(
-            &mut song_lyric_list_state,
-            chunk.height as usize,
-        );
+        self.correct_offset_to_make_lyric_centered(&mut song_lyric_list_state, chunk.height as usize);
 
         frame.render_stateful_widget(&self.song_lyric_list, chunk, &mut song_lyric_list_state);
     }
@@ -196,19 +175,11 @@ impl<'a> Controller for LyricPanel<'a> {
 impl<'a> LyricPanel<'a> {
     #[inline]
     /// 修正 offset 以使歌词居中
-    fn correct_offset_to_make_lyric_centered(
-        &self,
-        lyric_list_state: &mut ListState,
-        available_line_count: usize,
-    ) {
+    fn correct_offset_to_make_lyric_centered(&self, lyric_list_state: &mut ListState, available_line_count: usize) {
         if self.song_lyric_list_items.len() > 1 {
             let current_index = lyric_list_state.selected().unwrap_or(0);
             // 一句歌词所占行数（带翻译的歌词会占多行）
-            let lyric_line_count = self
-                .song_lyric_list_items
-                .get(current_index)
-                .unwrap()
-                .height();
+            let lyric_line_count = self.song_lyric_list_items.get(current_index).unwrap().height();
             let half_line_count = available_line_count / lyric_line_count / 2;
             let near_top_line = 0 + half_line_count;
             let near_bottom_line = if self.song_lyric_list_items.len() - 1 >= 2 * half_line_count {

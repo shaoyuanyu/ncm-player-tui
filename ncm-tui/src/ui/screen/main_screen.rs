@@ -62,67 +62,67 @@ impl<'a> Controller for MainScreen<'a> {
             //
             (Esc, PlaylistInside) => {
                 self.focus_panel_outside(Panels::Playlist);
-            }
+            },
             (Esc, LyricInside) => {
                 self.focus_panel_outside(Panels::Lyric);
-            }
+            },
             //
             (Down | Up, PlaylistOutside) => {
                 self.focus_panel_inside(Panels::Playlist);
-            }
+            },
             (Down | Up, LyricOutside) => {
                 self.focus_panel_inside(Panels::Lyric);
-            }
+            },
             (Down | Up, PlaylistInside) => {
                 self.playlist_panel.handle_event(cmd).await?;
-            }
+            },
             (Down | Up, LyricInside) => {
                 self.lyric_panel.handle_event(cmd).await?;
-            }
+            },
             //
             (NextPanel, PlaylistOutside) => {
                 self.focus_panel_outside(Panels::Lyric);
-            }
+            },
             (PrevPanel, LyricOutside) => {
                 self.focus_panel_outside(Panels::Playlist);
-            }
+            },
             //
             (EnterOrPlay, PlaylistOutside) => {
                 self.focus_panel_inside(Panels::Playlist);
-            }
+            },
             (EnterOrPlay, LyricOutside) => {
                 self.focus_panel_inside(Panels::Lyric);
-            }
+            },
             (EnterOrPlay | Play, PlaylistInside) => {
                 self.playlist_panel.handle_event(cmd).await?;
-            }
+            },
             (EnterOrPlay | Play, LyricInside) => {
                 self.lyric_panel.handle_event(cmd).await?;
                 self.focus_panel_outside(Panels::Lyric);
-            }
+            },
             //
             (WhereIsThisSong, _) => {
                 self.playlist_panel.handle_event(cmd).await?;
                 self.focus_panel_inside(Panels::Playlist);
-            }
+            },
             //
             (GoToTop | GoToBottom, PlaylistOutside | PlaylistInside) => {
                 self.playlist_panel.handle_event(cmd).await?;
                 self.focus_panel_inside(Panels::Playlist);
-            }
+            },
             (GoToTop | GoToBottom, LyricOutside | LyricInside) => {
                 self.lyric_panel.handle_event(cmd).await?;
                 self.focus_panel_inside(Panels::Lyric);
-            }
+            },
             //
             (SearchForward(_) | SearchBackward(_), _) => {
                 self.playlist_panel.handle_event(cmd).await?;
                 self.focus_panel_inside(Panels::Playlist);
-            }
+            },
             //
             (RefreshPlaylist, _) => {
                 self.playlist_panel.handle_event(cmd).await?;
-            }
+            },
             //
             (_, _) => return Ok(false),
         }
@@ -159,12 +159,12 @@ impl<'a> MainScreen<'a> {
                 self.current_focus_panel = FocusPanel::PlaylistOutside;
                 self.playlist_panel.focused_status = PanelFocusedStatus::Outside;
                 self.lyric_panel.focused_status = PanelFocusedStatus::Nop;
-            }
+            },
             Panels::Lyric => {
                 self.current_focus_panel = FocusPanel::LyricOutside;
                 self.playlist_panel.focused_status = PanelFocusedStatus::Nop;
                 self.lyric_panel.focused_status = PanelFocusedStatus::Outside;
-            }
+            },
         }
     }
 
@@ -174,12 +174,12 @@ impl<'a> MainScreen<'a> {
                 self.current_focus_panel = FocusPanel::PlaylistInside;
                 self.playlist_panel.focused_status = PanelFocusedStatus::Inside;
                 self.lyric_panel.focused_status = PanelFocusedStatus::Nop;
-            }
+            },
             Panels::Lyric => {
                 self.current_focus_panel = FocusPanel::LyricInside;
                 self.playlist_panel.focused_status = PanelFocusedStatus::Nop;
                 self.lyric_panel.focused_status = PanelFocusedStatus::Inside;
-            }
+            },
         }
     }
 }

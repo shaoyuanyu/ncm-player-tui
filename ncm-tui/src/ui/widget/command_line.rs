@@ -99,28 +99,23 @@ impl<'a> Controller for CommandLine<'a> {
 
     fn update_view(&mut self, style: &Style) {
         //
-        self.mode_label = Line::from(self.current_mode.clone()).bold().italic().fg(
-            match self.current_mode.as_str() {
-                NORMAL_TEXT => tailwind::RED.c600,
-                COMMAND_TEXT => tailwind::YELLOW.c600,
-                SEARCH_TEXT => tailwind::BLUE.c600,
-                _ => tailwind::BLACK,
-            },
-        );
+        self.mode_label = Line::from(self.current_mode.clone()).bold().italic().fg(match self.current_mode.as_str() {
+            NORMAL_TEXT => tailwind::RED.c600,
+            COMMAND_TEXT => tailwind::YELLOW.c600,
+            SEARCH_TEXT => tailwind::BLUE.c600,
+            _ => tailwind::BLACK,
+        });
 
         //
-        self.colon_line = Line::from(if self.show_colon { ": " } else { "" })
-            .style(style.add_modifier(Modifier::BOLD));
+        self.colon_line = Line::from(if self.show_colon { ": " } else { "" }).style(style.add_modifier(Modifier::BOLD));
 
         //
         self.interactive_area.set_style(*style);
         self.interactive_area.set_cursor_line_style(*style);
         if self.show_cursor {
-            self.interactive_area
-                .set_cursor_style(Style::default().bg(tailwind::SLATE.c700));
+            self.interactive_area.set_cursor_style(Style::default().bg(tailwind::SLATE.c700));
         } else {
-            self.interactive_area
-                .set_cursor_style(Style::default().add_modifier(Modifier::HIDDEN));
+            self.interactive_area.set_cursor_style(Style::default().add_modifier(Modifier::HIDDEN));
         }
     }
 
@@ -130,9 +125,7 @@ impl<'a> Controller for CommandLine<'a> {
             .constraints(
                 [
                     Constraint::Length(UnicodeWidthStr::width(self.current_mode.as_str()) as u16),
-                    Constraint::Max(
-                        UnicodeWidthStr::width(if self.show_colon { ": " } else { "" }) as u16,
-                    ),
+                    Constraint::Max(UnicodeWidthStr::width(if self.show_colon { ": " } else { "" }) as u16),
                     Constraint::Fill(1),
                 ]
                 .as_ref(),

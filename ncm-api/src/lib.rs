@@ -34,10 +34,7 @@ impl NcmClient {
             lyrics_path,
             api_child_process: None,
             local_api_url: String::from("http://localhost:3000"),
-            http_client: ClientBuilder::new()
-                .no_proxy()
-                .build()
-                .expect("failed to build HTTP client"),
+            http_client: ClientBuilder::new().no_proxy().build().expect("failed to build HTTP client"),
             cookie: String::new(),
             login_account: None,
         }
@@ -75,8 +72,8 @@ impl NcmClient {
             Some(api_child_process) => {
                 api_child_process.kill().await?;
                 api_child_process.wait().await?;
-            }
-            None => {}
+            },
+            None => {},
         }
 
         Ok(())
@@ -87,12 +84,7 @@ impl NcmClient {
 impl NcmClient {
     /// 保存 cookie
     pub fn store_cookie(&self) {
-        match fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(&self.cookie_path)
-        {
+        match fs::OpenOptions::new().write(true).create(true).truncate(true).open(&self.cookie_path) {
             Ok(mut cookie_file) => match cookie_file.write_all(self.cookie.clone().as_bytes()) {
                 Ok(_) => debug!("cookie stored at {:?}", &self.cookie_path),
                 Err(err) => error!("failed to store cookie at {:?}: {}", &self.cookie_path, err),
@@ -131,11 +123,7 @@ impl NcmClient {
     pub async fn get_login_qr(&self) -> Result<(String, String)> {
         let key_response = self
             .http_client
-            .get(format!(
-                "{}/login/qr/key?timestamp={}",
-                &self.local_api_url,
-                Utc::now().timestamp()
-            ))
+            .get(format!("{}/login/qr/key?timestamp={}", &self.local_api_url, Utc::now().timestamp()))
             .send()
             .await?
             .json::<QrResponse<QrKeyData>>()
@@ -146,22 +134,14 @@ impl NcmClient {
 
             let create_response = self
                 .http_client
-                .get(format!(
-                    "{}/login/qr/create?key={}&qrimg=true&timestamp={}",
-                    &self.local_api_url,
-                    &uni_key,
-                    Utc::now().timestamp()
-                ))
+                .get(format!("{}/login/qr/create?key={}&qrimg=true&timestamp={}", &self.local_api_url, &uni_key, Utc::now().timestamp()))
                 .send()
                 .await?
                 .json::<QrResponse<QrCreateData>>()
                 .await?;
 
             if create_response.code == 200 {
-                debug!(
-                    "get login qr key & url: {}, {}",
-                    uni_key, create_response.data.qrurl
-                );
+                debug!("get login qr key & url: {}, {}", uni_key, create_response.data.qrurl);
                 Ok((uni_key, create_response.data.qrurl))
             } else {
                 Err(anyhow!("failed to get login qr url"))
@@ -175,12 +155,7 @@ impl NcmClient {
     pub async fn check_login_qr(&mut self, uni_key: &str) -> Result<usize> {
         let check_response = self
             .http_client
-            .get(format!(
-                "{}/login/qr/check?key={}&timestamp={}",
-                &self.local_api_url,
-                &uni_key,
-                Utc::now().timestamp()
-            ))
+            .get(format!("{}/login/qr/check?key={}&timestamp={}", &self.local_api_url, &uni_key, Utc::now().timestamp()))
             .send()
             .await?
             .json::<QrCheckResponse>()
@@ -254,10 +229,7 @@ impl NcmClient {
 
             let playlist_response = self
                 .http_client
-                .post(format!(
-                    "{}/user/playlist?uid={}",
-                    &self.local_api_url, user_id
-                ))
+                .post(format!("{}/user/playlist?uid={}", &self.local_api_url, user_id))
                 .form(&[("cookie", &self.cookie)])
                 .send()
                 .await?;
@@ -266,10 +238,7 @@ impl NcmClient {
 
             // 状态码报错
             if v_playlist["code"].as_u64().unwrap() != 200 {
-                return Err(anyhow!(
-                    "failed to load songs into songlist, code {}",
-                    v_playlist["code"].as_u64().unwrap()
-                ));
+                return Err(anyhow!("failed to load songs into songlist, code {}", v_playlist["code"].as_u64().unwrap()));
             }
             // 仍有更多页
             if v_playlist["more"].as_bool().unwrap() {
@@ -281,9 +250,7 @@ impl NcmClient {
                     name: playlist["name"].as_str().unwrap().to_string(),
                     id: playlist["id"].as_u64().unwrap(),
                     songs_count: playlist["trackCount"].as_u64().unwrap_or(0) as usize,
-                    creator: if let Some(creator_nickname) =
-                        playlist["creator"]["nickname"].as_str()
-                    {
+                    creator: if let Some(creator_nickname) = playlist["creator"]["nickname"].as_str() {
                         creator_nickname.to_string()
                     } else {
                         String::new()
@@ -307,25 +274,18 @@ impl NcmClient {
         while songlist.songs.len() % 1000 == 0 {
             let playlist_detail_response = self
                 .http_client
-                .post(format!(
-                    "{}/playlist/track/all?id={}&limit=1000&offset={}",
-                    &self.local_api_url, songlist.id, offset
-                ))
+                .post(format!("{}/playlist/track/all?id={}&limit=1000&offset={}", &self.local_api_url, songlist.id, offset))
                 .form(&[("cookie", &self.cookie)])
                 .send()
                 .await?;
 
             offset += 1000;
 
-            let v_playlist_detail: Value =
-                serde_json::from_slice(&playlist_detail_response.bytes().await?)?;
+            let v_playlist_detail: Value = serde_json::from_slice(&playlist_detail_response.bytes().await?)?;
 
             // 状态码报错
             if v_playlist_detail["code"].as_u64().unwrap() != 200 {
-                return Err(anyhow!(
-                    "failed to load songs into songlist, code {}",
-                    v_playlist_detail["code"].as_u64().unwrap()
-                ));
+                return Err(anyhow!("failed to load songs into songlist, code {}", v_playlist_detail["code"].as_u64().unwrap()));
             }
             // 获取到的歌曲列表为空
             if v_playlist_detail["songs"].as_array().unwrap().is_empty() {
@@ -337,15 +297,9 @@ impl NcmClient {
                 let song = Song {
                     name: track["name"].as_str().unwrap().to_string(),
                     id: track["id"].as_u64().unwrap(),
-                    singer: track["ar"][0]["name"]
-                        .as_str()
-                        .unwrap_or("Unknown")
-                        .to_string(),
+                    singer: track["ar"][0]["name"].as_str().unwrap_or("Unknown").to_string(),
                     singer_id: track["ar"][0]["id"].as_u64().unwrap(),
-                    album: track["al"]["name"]
-                        .as_str()
-                        .unwrap_or("Unknown")
-                        .to_string(),
+                    album: track["al"]["name"].as_str().unwrap_or("Unknown").to_string(),
                     album_id: track["al"]["id"].as_u64().unwrap(),
                     duration: track["dt"].as_u64().unwrap(),
                     song_url: None,
@@ -367,10 +321,7 @@ impl NcmClient {
     pub async fn check_song_availability(&self, song_id: u64) -> Result<bool> {
         let check_response = self
             .http_client
-            .post(format!(
-                "{}/check/music?id={}",
-                &self.local_api_url, song_id
-            ))
+            .post(format!("{}/check/music?id={}", &self.local_api_url, song_id))
             .form(&[("cookie", &self.cookie)])
             .send()
             .await?;
@@ -390,10 +341,7 @@ impl NcmClient {
 
         let song_url_response = self
             .http_client
-            .post(format!(
-                "{}/song/url/v1?id={}&level={}",
-                &self.local_api_url, song.id, "jymaster"
-            ))
+            .post(format!("{}/song/url/v1?id={}&level={}", &self.local_api_url, song.id, "jymaster"))
             .form(&[("cookie", &self.cookie)])
             .send()
             .await?;
@@ -438,37 +386,15 @@ impl NcmClient {
         let v_lyric: Value = serde_json::from_slice(&lyric_response.bytes().await?)?;
 
         let lyric_text = v_lyric["lrc"]["lyric"].as_str().unwrap_or("").to_string();
-        let trans_lyric_text = v_lyric["tlyric"]["lyric"]
-            .as_str()
-            .unwrap_or("")
-            .to_string();
-        let roman_lyric_text = v_lyric["romalrc"]["lyric"]
-            .as_str()
-            .unwrap_or("")
-            .to_string();
+        let trans_lyric_text = v_lyric["tlyric"]["lyric"].as_str().unwrap_or("").to_string();
+        let roman_lyric_text = v_lyric["romalrc"]["lyric"].as_str().unwrap_or("").to_string();
 
-        let origin_lyric_lines: Vec<String> = lyric_text
-            .split('\n')
-            .into_iter()
-            .map(|s| s.to_string())
-            .collect();
-        let origin_trans_lyric_lines: Vec<String> = trans_lyric_text
-            .split('\n')
-            .into_iter()
-            .map(|s| s.to_string())
-            .collect();
-        let origin_roman_lyric_lines: Vec<String> = roman_lyric_text
-            .split('\n')
-            .into_iter()
-            .map(|s| s.to_string())
-            .collect();
+        let origin_lyric_lines: Vec<String> = lyric_text.split('\n').into_iter().map(|s| s.to_string()).collect();
+        let origin_trans_lyric_lines: Vec<String> = trans_lyric_text.split('\n').into_iter().map(|s| s.to_string()).collect();
+        let origin_roman_lyric_lines: Vec<String> = roman_lyric_text.split('\n').into_iter().map(|s| s.to_string()).collect();
 
         // 编码歌词
-        let lyrics = encode_lyrics(
-            origin_lyric_lines,
-            origin_trans_lyric_lines,
-            origin_roman_lyric_lines,
-        );
+        let lyrics = encode_lyrics(origin_lyric_lines, origin_trans_lyric_lines, origin_roman_lyric_lines);
 
         debug!("lyrics encoded: {:?}", lyrics);
 
@@ -491,7 +417,7 @@ impl NcmClient {
                     Ok(_) => debug!("lyrics stored at {:?}", &self.lyrics_path),
                     Err(err) => {
                         error!("failed to store lyrics at {:?}: {}", &self.lyrics_path, err)
-                    }
+                    },
                 },
                 Err(err) => error!("{:?}", err),
             },
@@ -501,8 +427,7 @@ impl NcmClient {
 
     /// 尝试读本地歌词缓存
     fn try_read_lyrics_cache(&self, song_id: u64) -> Result<Lyrics> {
-        let mut lyrics_file =
-            File::open(self.lyrics_path.clone().join(format!("{}.lyrics", song_id)))?;
+        let mut lyrics_file = File::open(self.lyrics_path.clone().join(format!("{}.lyrics", song_id)))?;
         let mut json_data = String::new();
         lyrics_file.read_to_string(&mut json_data)?;
         let lyrics: Lyrics = serde_json::from_str(&json_data)?;
@@ -514,11 +439,7 @@ impl NcmClient {
 
 #[inline]
 /// 编码并序列化歌词
-fn encode_lyrics(
-    origin_lyric_lines: Vec<String>,
-    origin_trans_lyric_lines: Vec<String>,
-    origin_roman_lyric_lines: Vec<String>,
-) -> Lyrics {
+fn encode_lyrics(origin_lyric_lines: Vec<String>, origin_trans_lyric_lines: Vec<String>, origin_roman_lyric_lines: Vec<String>) -> Lyrics {
     let mut lyrics: Lyrics = Vec::new();
 
     // 正则表达式
@@ -530,27 +451,17 @@ fn encode_lyrics(
 
     // 修正闭包
     let fix_line = |line: &String| -> String {
-        let mut fixed = timestamp_7bit_re
-            .replace_all(line, "[$1:$2.000]")
-            .to_string();
-        fixed = timestamp_10bit_re
-            .replace_all(&fixed, "[$1:$2.0$3$4]")
-            .to_string();
-        fixed = timestamp_9bit_re
-            .replace_all(&fixed, "[$1:$2.00$3]")
-            .to_string();
-        fixed = timestamp_abnormal_re
-            .replace_all(&fixed, "[$1:$2.$3]")
-            .to_string();
+        let mut fixed = timestamp_7bit_re.replace_all(line, "[$1:$2.000]").to_string();
+        fixed = timestamp_10bit_re.replace_all(&fixed, "[$1:$2.0$3$4]").to_string();
+        fixed = timestamp_9bit_re.replace_all(&fixed, "[$1:$2.00$3]").to_string();
+        fixed = timestamp_abnormal_re.replace_all(&fixed, "[$1:$2.$3]").to_string();
         fixed.to_string()
     };
 
     // 进行修正
     let fixed_lyric_lines: Vec<String> = origin_lyric_lines.iter().map(fix_line).collect();
-    let fixed_trans_lyric_lines: Vec<String> =
-        origin_trans_lyric_lines.iter().map(fix_line).collect();
-    let fixed_roman_lyric_lines: Vec<String> =
-        origin_roman_lyric_lines.iter().map(fix_line).collect();
+    let fixed_trans_lyric_lines: Vec<String> = origin_trans_lyric_lines.iter().map(fix_line).collect();
+    let fixed_roman_lyric_lines: Vec<String> = origin_roman_lyric_lines.iter().map(fix_line).collect();
 
     // 匹配时间戳并编码
     let mut trans_lyric_line_pointer = (fixed_trans_lyric_lines.len() - 1) as isize;
@@ -560,17 +471,11 @@ fn encode_lyrics(
         // lyric
         if timestamp_re.is_match(lyric_line) {
             // 计算时间戳
-            let timestamp = (lyric_line[1..=2].parse::<u64>().unwrap() * 60
-                + lyric_line[4..=5].parse::<u64>().unwrap())
-                * 1000
-                + lyric_line[7..=9].parse::<u64>().unwrap_or(0);
+            let timestamp = (lyric_line[1..=2].parse::<u64>().unwrap() * 60 + lyric_line[4..=5].parse::<u64>().unwrap()) * 1000 + lyric_line[7..=9].parse::<u64>().unwrap_or(0);
 
             lyrics.push(LyricLine {
                 timestamp,
-                lyric_line: timestamp_re
-                    .replace_all(lyric_line, "")
-                    .trim_end_matches('\t')
-                    .to_string(),
+                lyric_line: timestamp_re.replace_all(lyric_line, "").trim_end_matches('\t').to_string(),
                 trans_lyric_line: None,
                 roman_lyric_line: None,
             })
@@ -580,9 +485,7 @@ fn encode_lyrics(
 
         // trans_lyric
         while trans_lyric_line_pointer >= 0 {
-            if let Some(trans_lyric_line) =
-                fixed_trans_lyric_lines.get(trans_lyric_line_pointer as usize)
-            {
+            if let Some(trans_lyric_line) = fixed_trans_lyric_lines.get(trans_lyric_line_pointer as usize) {
                 if !timestamp_re.is_match(trans_lyric_line) {
                     trans_lyric_line_pointer -= 1;
                     continue;
@@ -590,12 +493,7 @@ fn encode_lyrics(
 
                 if trans_lyric_line.starts_with(&lyric_line[0..=10]) {
                     if let Some(last) = lyrics.last_mut() {
-                        last.trans_lyric_line = Some(
-                            timestamp_re
-                                .replace_all(trans_lyric_line, "")
-                                .trim_end_matches('\t')
-                                .to_string(),
-                        );
+                        last.trans_lyric_line = Some(timestamp_re.replace_all(trans_lyric_line, "").trim_end_matches('\t').to_string());
                     }
 
                     trans_lyric_line_pointer -= 1;
@@ -609,9 +507,7 @@ fn encode_lyrics(
 
         // roman_lyric
         while roman_lyric_line_pointer >= 0 {
-            if let Some(roman_lyric_line) =
-                fixed_roman_lyric_lines.get(roman_lyric_line_pointer as usize)
-            {
+            if let Some(roman_lyric_line) = fixed_roman_lyric_lines.get(roman_lyric_line_pointer as usize) {
                 if !timestamp_re.is_match(roman_lyric_line) {
                     roman_lyric_line_pointer -= 1;
                     continue;
@@ -619,12 +515,7 @@ fn encode_lyrics(
 
                 if roman_lyric_line.starts_with(&lyric_line[0..=10]) {
                     if let Some(last) = lyrics.last_mut() {
-                        last.roman_lyric_line = Some(
-                            timestamp_re
-                                .replace_all(roman_lyric_line, "")
-                                .trim_end_matches('\t')
-                                .to_string(),
-                        );
+                        last.roman_lyric_line = Some(timestamp_re.replace_all(roman_lyric_line, "").trim_end_matches('\t').to_string());
                     }
 
                     roman_lyric_line_pointer -= 1;

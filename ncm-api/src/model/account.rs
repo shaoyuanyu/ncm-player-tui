@@ -22,10 +22,6 @@ impl FromJson for Account {
         let nickname = value["nickname"].as_str().unwrap().to_string();
         let vip_type = value["vipType"].as_i64().unwrap();
 
-        Ok(Account {
-            user_id,
-            nickname,
-            vip_type,
-        })
+        Ok(Account { user_id, nickname, vip_type })
     }
 }

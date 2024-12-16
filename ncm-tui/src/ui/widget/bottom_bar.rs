@@ -49,29 +49,15 @@ impl<'a> Controller for BottomBar<'a> {
         let player_guard = player.lock().await;
 
         // control_bar
-        self.info_bar_text = Text::from(
-            Line::from(format!(
-                " {}  |  {}  ",
-                player_guard.play_mode(),
-                if player_guard.is_playing() {
-                    '\u{f03e4}'
-                } else {
-                    '\u{f040a}'
-                },
-            ))
-            .centered(),
-        );
+        self.info_bar_text = Text::from(Line::from(format!(" {}  |  {}  ", player_guard.play_mode(), if player_guard.is_playing() { '\u{f03e4}' } else { '\u{f040a}' },)).centered());
 
         // playback_bar
-        if let (Some(player_position), Some(player_duration)) =
-            (player_guard.position(), player_guard.duration())
-        {
-            self.playback_ratio =
-                if player_position.mseconds() as f64 / player_duration.mseconds() as f64 <= 1.0 {
-                    player_position.mseconds() as f64 / player_duration.mseconds() as f64
-                } else {
-                    1.0
-                };
+        if let (Some(player_position), Some(player_duration)) = (player_guard.position(), player_guard.duration()) {
+            self.playback_ratio = if player_position.mseconds() as f64 / player_duration.mseconds() as f64 <= 1.0 {
+                player_position.mseconds() as f64 / player_duration.mseconds() as f64
+            } else {
+                1.0
+            };
             self.playback_label = format!(
                 "{:02}:{:02}/{:02}:{:02}",
                 player_position.minutes(),
@@ -101,24 +87,16 @@ impl<'a> Controller for BottomBar<'a> {
     }
 
     fn update_view(&mut self, style: &Style) {
-        self.control_bar = Paragraph::new(self.info_bar_text.clone())
-            .block(Block::default().borders(Borders::ALL))
-            .style(*style);
+        self.control_bar = Paragraph::new(self.info_bar_text.clone()).block(Block::default().borders(Borders::ALL)).style(*style);
 
         self.playback_bar = Gauge::default()
             .block({
                 let mut block = Block::default().borders(Borders::ALL).style(*style);
-                if let (Some(song_name), Some(artist_name), Some(song_quality_level)) = (
-                    self.song_name.clone(),
-                    self.singer_name.clone(),
-                    self.song_quality_level.clone(),
-                ) {
+                if let (Some(song_name), Some(artist_name), Some(song_quality_level)) = (self.song_name.clone(), self.singer_name.clone(), self.song_quality_level.clone()) {
                     block = block
                         .title_top(Line::from(format!("{}", song_name)).centered())
                         .title_bottom(Line::from(format!("{}", artist_name)).centered())
-                        .title_bottom(
-                            Line::from(format!("音质:{}", song_quality_level)).right_aligned(),
-                        );
+                        .title_bottom(Line::from(format!("音质:{}", song_quality_level)).right_aligned());
                 }
                 block
             })
@@ -127,12 +105,7 @@ impl<'a> Controller for BottomBar<'a> {
             .label(self.playback_label.clone());
 
         self.volume_bar = Gauge::default()
-            .block(
-                Block::default()
-                    .title("Volume")
-                    .borders(Borders::ALL)
-                    .style(*style),
-            )
+            .block(Block::default().title("Volume").borders(Borders::ALL).style(*style))
             .gauge_style(tailwind::BLUE.c400)
             .ratio(self.volume);
     }
@@ -140,14 +113,7 @@ impl<'a> Controller for BottomBar<'a> {
     fn draw(&self, frame: &mut Frame, chunk: Rect) {
         let bottom_bar_chunks = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints(
-                [
-                    Constraint::Length(20),
-                    Constraint::Min(10),
-                    Constraint::Length(20),
-                ]
-                .as_ref(),
-            )
+            .constraints([Constraint::Length(20), Constraint::Min(10), Constraint::Length(20)].as_ref())
             .split(chunk);
 
         // control_bar
