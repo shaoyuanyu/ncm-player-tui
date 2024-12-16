@@ -28,3 +28,5 @@ const ITEM_SELECTED_STYLE: Style = Style::new()
 const LYRIC_FOCUSED_STYLE: Style = Style::new()
     .fg(tailwind::RED.c600)
     .add_modifier(Modifier::BOLD);
+
+const TABLE_HEADER_STYLE: Style = Style::new().fg(tailwind::WHITE).bg(tailwind::RED.c300);

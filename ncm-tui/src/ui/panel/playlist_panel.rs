@@ -4,7 +4,7 @@ use crate::ui::Controller;
 use crate::{ncm_client, player};
 use ncm_api::model::Song;
 use ratatui::layout::{Constraint, Rect};
-use ratatui::prelude::{Style, Text};
+use ratatui::prelude::Style;
 use ratatui::style::palette::tailwind;
 use ratatui::widgets::{Block, Borders, Cell, Row, Table, TableState};
 use ratatui::Frame;
@@ -170,7 +170,7 @@ impl<'a> Controller for PlaylistPanel<'a> {
         )
         .header(
             Row::new(vec![
-                Cell::from(Text::from("曲名")),
+                Cell::new("曲名"),
                 Cell::new("歌手/乐手"),
                 Cell::new("专辑"),
                 Cell::new("时长"),

@@ -280,6 +280,14 @@ impl NcmClient {
                 songlists.push(Songlist {
                     name: playlist["name"].as_str().unwrap().to_string(),
                     id: playlist["id"].as_u64().unwrap(),
+                    songs_count: playlist["trackCount"].as_u64().unwrap_or(0) as usize,
+                    creator: if let Some(creator_nickname) =
+                        playlist["creator"]["nickname"].as_str()
+                    {
+                        creator_nickname.to_string()
+                    } else {
+                        String::new()
+                    },
                     songs: Vec::new(),
                 });
             }
