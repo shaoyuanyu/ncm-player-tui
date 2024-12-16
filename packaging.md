@@ -9,9 +9,10 @@
 ```shell
 cargo build --release
 mkdir -p ./target/package/src ./target/package/output
-rm ./target/package/src/ncm-tui-player
+rm ./target/package/src/ncm-tui-player ./target/package/src/ncm-tui-player.sh
 ln ./target/release/ncm-tui ./target/package/src/ncm-tui-player
-export NCM_TUI_PLAYER_VERSION="1.0.0"
+ln ./bin/ncm-tui-player.sh ./target/package/src/ncm-tui-player.sh
+export NCM_TUI_PLAYER_VERSION="2.0.0"
 ```
 
 ## 打包成 `rpm`
@@ -26,14 +27,16 @@ fpm -f -s dir -t rpm \
 --description "A TUI player client for netease-cloud-music written in Rust." \
 --url "https://github.com/shaoyuanyu/ncm-tui-player" \
 --maintainer "shaoyuanyu<code200.ysy@gmail.com>" \
---depends openssl \
 --depends gstreamer1 \
 --depends gstreamer1-plugins-base \
 --verbose \
-./target/package/src/ncm-tui-player=/usr/bin/ncm-tui-player
+./target/package/src/ncm-tui-player.sh=/usr/bin/ncm-tui-player \
+./target/package/src/ncm-tui-player=/usr/bin/ncm-tui-player.1
 ```
 
 ## 打包成 `deb`
+
+待更新
 
 ```shell
 fpm -f -s dir -t deb \
