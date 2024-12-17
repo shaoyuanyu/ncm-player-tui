@@ -21,17 +21,17 @@ impl Path {
     pub fn new() -> Self {
         let data = dirs_next::data_dir().unwrap().join(APP_NAME);
         if !data.exists() {
-            fs::create_dir(&data).expect("Couldn't create data dir.");
+            fs::create_dir_all(&data).expect("Couldn't create data dir.");
         }
 
         let config = dirs_next::config_dir().unwrap().join(APP_NAME);
         if !config.exists() {
-            fs::create_dir(&config).expect("Couldn't create config dir.");
+            fs::create_dir_all(&config).expect("Couldn't create config dir.");
         }
 
         let cache = dirs_next::cache_dir().unwrap().join(APP_NAME);
         if !cache.exists() {
-            fs::create_dir(&cache).expect("Couldn't create cache dir.");
+            fs::create_dir_all(&cache).expect("Couldn't create cache dir.");
         }
 
         let api_program = data.clone().join("neteasecloudmusicapi");
@@ -42,7 +42,7 @@ impl Path {
 
         let lyrics = cache.clone().join("lyrics");
         if !lyrics.exists() {
-            fs::create_dir(&lyrics).expect("Couldn't create lyrics dir.");
+            fs::create_dir_all(&lyrics).expect("Couldn't create lyrics dir.");
         }
 
         Self {
