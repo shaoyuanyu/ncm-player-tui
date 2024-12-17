@@ -1,5 +1,7 @@
 # NCM-TUI-Player
 
+![desktop-icon](./public/ncm-tui-player.svg)
+
 本项目是一款用 rust 编写的网易云音乐终端界面播放器。
 
 提供仿 `Vim` 式的命令和交互体验。

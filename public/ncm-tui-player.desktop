@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=ncm-tui-player
+Comment=A TUI player client for netease-cloud-music written in Rust.
+Exec=ncm-tui-player
+Terminal=true
+Type=Application
+Icon=ncm_tui_player
+Keywords=ncm;player;music;
+Categories=Music;
