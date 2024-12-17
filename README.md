@@ -126,16 +126,15 @@ npm install
 
 #### 4. 安装 Gstreamer
 
-理论上本项目只需要 gstreamer 和 gstreamer-base 组件。
-
-各平台下的安装手册有待补充，可以参考[官方文档](https://gstreamer.freedesktop.org/documentation/installing/index.html?gi-language=c)自行安装。
+本项目至少需要 `gstreamer-base` `gstreamer-good` 和 `gstreamer-bad` 组件，
+请参考 [官方文档](https://gstreamer.freedesktop.org/documentation/installing/index.html?gi-language=c) 自行安装对应系统的版本。
 
 ### 对于 remote api 模式
 
 依赖如下：
 - [Gstreamer](https://gstreamer.freedesktop.org/download)
 
-Gstreamer 安装与 `local api` 模式相同。
+Gstreamer 的安装与 `local api` 模式下相同。
 
 ## 运行说明
 
