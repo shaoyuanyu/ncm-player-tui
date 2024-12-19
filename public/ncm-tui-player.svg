@@ -8,7 +8,35 @@
    xmlns="http://www.w3.org/2000/svg"
    xmlns:svg="http://www.w3.org/2000/svg">
   <defs
-     id="defs3" />
+     id="defs3">
+    <linearGradient
+       id="linearGradient13">
+      <stop
+         style="stop-color:#ffffff;stop-opacity:1;"
+         offset="0"
+         id="stop13" />
+      <stop
+         style="stop-color:#ffffff;stop-opacity:0;"
+         offset="1"
+         id="stop14" />
+    </linearGradient>
+    <linearGradient
+       id="swatch10">
+      <stop
+         style="stop-color:#ffffff;stop-opacity:1;"
+         offset="0"
+         id="stop10" />
+    </linearGradient>
+    <linearGradient
+       xlink:href="#linearGradient13"
+       id="linearGradient14"
+       x1="12"
+       y1="16.000414"
+       x2="18.996044"
+       y2="16.000414"
+       gradientUnits="userSpaceOnUse"
+       spreadMethod="pad" />
+  </defs>
   <image
      x="1.5592999"
      y="2"
@@ -26,7 +54,7 @@
      d="M 12,13.150594 V 11 l 6.996044,3.983701 v 2.033426 L 12,21.000827 v -2.154373 l 5.268766,-2.834702 z"
      aria-label="&gt;"
      id="path2-7"
-     style="fill:#ffffff;fill-opacity:1;stroke-width:3.7796" />
+     style="fill:url(#linearGradient14);fill-opacity:1;fill-rule:nonzero;stroke-width:3.7796" />
   <path
      d="m 3.998,45.998 v 1 c 0,7.2032 5.8006,13.004 13.004,13.004 h 29.996 c 7.2032,0 13.004,-5.8006 13.004,-13.004 v -1 C 60.002,53.2013 54.2013,59 46.998,59 H 17.002 C 9.7987,59 3.998,53.2012 3.998,45.998 Z"
      fill="#000000"
