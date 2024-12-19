@@ -140,6 +140,28 @@ Gstreamer 的安装与 `local api` 模式下相同。
 
 运行时需要将 `stderr` 输出重定向。参考 `./bin/ncm-tui-player.sh` 脚本。
 
+## 编译
+
+除了使用本项目提供的打包，也欢迎您选择在本地自行编译。
+
+### 1. Windows 下安装 Gstreamer 并编译本项目
+
+根据 [Gstreamer 官方文档](https://gstreamer.freedesktop.org/documentation/installing/on-windows.html?gi-language=c) ，
+需要安装 Gstreamer 的开发环境和运行时环境，此处注意选择的版本应与你的 rust 工具链使用的编译环境相同：
+- 如果你的 rust 工具链使用了 `MSVC` ，则需要下载 Gstreamer 的 `MSVC 64-bit runtime installer` 和 `MSVC 64-bit development installer`
+- 如果你的 rust 工具链使用了 `MinGW` ，则需要下载 Gstreamer 的 `MinGW 64-bit runtime installer` 和 `MinGW 64-bit development installer`
+
+安装时选择 `Typical` 配置即可。
+
+安装后需要设置一些环境变量，以下演示中均以 Gstreamer 选择 `MSVC 64-bit` 版本且安装在 `C:\gstreamer` 路径的情况为例：
+- `Path` 变量中加入 Gstreamer 的 bin 目录 `C:\gstreamer\1.0\msvc_x86_64\bin`
+- 新建 `GST_PLUGIN_PATH` 变量，值为 Gstreamer 的插件目录 `C:\gstreamer\1.0\msvc_x86_64\lib\gstreamer-1.0`
+
+至此 Gstreamer 安装完毕。
+
+在编译本项目前需要设置 `PKG_CONFIG_PATH` 环境变量（永久或临时均可）为：
+`C:\gstreamer\1.0\msvc_x86_64\lib\pkgconfig;C:\gstreamer\1.0\msvc_x86_64\lib\gstreamer-1.0\pkgconfig` （包含2个目录）。
+
 ## 参考项目
 
 https://gitlab.com/jcheatum/rmup

@@ -419,11 +419,14 @@ impl Player {
     async fn play_new_song_by_uri(&mut self, uri: &str) {
         self.play.stop();
         self.play.set_uri(Some(uri));
-        self.play.set_volume(self.volume);
         self.play.play();
+        self.play.set_volume(self.volume);
 
         // 缓冲 500 ms ，防止出现切换到下一首歌但 gstreamer 端还未更新完成，这会引起歌词快进现象
         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
+        // gstreamer 存在切换歌曲后音量恢复初始状态的情况
+        self.play.set_volume(self.volume);
     }
 
     async fn update_current_song_lyrics<'c>(&mut self, ncm_client_guard: MutexGuard<'c, NcmClient>) -> Result<()> {

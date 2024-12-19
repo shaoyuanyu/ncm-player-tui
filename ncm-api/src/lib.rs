@@ -130,11 +130,27 @@ impl NcmClient {
 
         let api_program_path = self.api_program_path.to_str().unwrap();
 
+        #[cfg(target_os = "linux")]
         let api_child_process: process::Child = process::Command::new("sh")
             .arg("-c")
             .arg(format!("node {}/app.js 1>&2", api_program_path))
             .spawn()
-            .expect("Failed to spawn API child process");
+            .expect("Failed to spawn API child process on Linux");
+
+        #[cfg(target_os = "windows")]
+        let api_child_process: process::Child = process::Command::new("cmd")
+            .arg("/C")
+            .arg(format!("node {}/app.js > {}/api.log 2>&1", api_program_path, api_program_path))
+            .spawn()
+            .expect("Failed to spawn API child process on Windows");
+
+        #[cfg(target_os = "macos")]
+        // TODO: macos 下的命令待修正
+        let api_child_process: process::Child = process::Command::new("sh")
+            .arg("-c")
+            .arg(format!("node {}/app.js 1>&2", api_program_path))
+            .spawn()
+            .expect("Failed to spawn API child process on MacOS");
 
         self.api_child_process = Some(api_child_process);
 
