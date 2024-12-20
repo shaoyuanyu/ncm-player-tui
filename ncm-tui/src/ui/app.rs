@@ -63,7 +63,37 @@ impl<'a> App<'a> {
     pub fn draw_launch_screen(&mut self) -> Result<()> {
         let mut logo_lines = Vec::new();
         for logo_line in LOGO_LINES {
-            logo_lines.push(Line::from(logo_line).centered());
+            // 为 logo 绘制2格阴影
+            let mut line_spans = Vec::new();
+            let mut next_space_is_shadow = false;
+            let mut shadow_count = 0;
+            for char in logo_line.chars() {
+                match char {
+                    ' ' => {
+                        if next_space_is_shadow {
+                            line_spans.push(Span::from("▇").fg(Color::Rgb(255, 136, 136)));
+
+                            shadow_count += 1;
+                            if shadow_count == 2 {
+                                shadow_count = 0;
+                                next_space_is_shadow = false;
+                            }
+                        } else {
+                            line_spans.push(Span::from(" "));
+                        }
+                    },
+                    '▇' => {
+                        line_spans.push(Span::from("▇").fg(tailwind::WHITE));
+
+                        shadow_count = 0;
+                        next_space_is_shadow = true;
+                    },
+                    _ => {},
+                }
+            }
+
+            //
+            logo_lines.push(Line::from(line_spans).centered());
         }
         let logo_lines_count = logo_lines.len();
 
@@ -75,13 +105,13 @@ impl<'a> App<'a> {
             let available_line_count = chunk.height as usize;
             if available_line_count > logo_lines_count {
                 for _ in 0..(available_line_count - logo_lines_count) / 2 {
-                    logo_lines.insert(0, Line::from(""))
+                    logo_lines.insert(0, Line::from(""));
                 }
             }
 
-            let logo_paragraph = Paragraph::new(logo_lines).bg(tailwind::RED.c500).fg(tailwind::WHITE);
+            let logo_paragraph = Paragraph::new(logo_lines).bg(tailwind::RED.c500);
 
-            frame.render_widget(&logo_paragraph, chunk);
+            frame.render_widget(logo_paragraph, chunk);
         })?;
 
         Ok(())
