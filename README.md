@@ -2,7 +2,7 @@
 
 ![desktop-icon](./public/icon.png)
 
-本项目是一款用 rust 编写的网易云音乐终端界面播放器。
+本项目是一款用 Rust 编写的网易云音乐终端界面播放器。
 
 提供仿 `Vim` 式的命令和交互体验。
 
@@ -45,10 +45,11 @@
 - [x] “一键开始播放”
 - [x] 歌词滚动显示
 - [x] 跳转到某句歌词对应的时间戳播放
+- [ ] 播放记录计入网易云云端记录和听歌报告（上游接口目前疑似高危）
 
 ### 播放列表
-- [x] 从用户创建的歌单创建播放列表
-- [x] 在播放列表中跳转到当前播放的歌曲所在位置
+- [x] 播放用户歌单（创建+收藏）
+- [x] 在播放列表中跳转到当前播放的歌曲
 - [x] 在播放列表中搜索歌曲名
   - [ ] 支持正则表达式
 
@@ -61,19 +62,22 @@
 
 ### 其他
 - [x] 本地 api + 远程 api
+- [ ] 适配系统媒体播放接口
+  - [ ] MPRIS (Linux)
+  - [ ] SMTC (Windows)
 - [ ] 自定义Style
 - [ ] 设置页面
 - [ ] 用户数据缓存
 - [ ] 打包分发
-  - [ ] Linux (rpm)
-  - [ ] Linux (deb)
+  - [x] Linux (rpm)
+  - [x] Linux (deb)
   - [ ] Linux (flatpak)
   - [ ] MacOS
   - [ ] Windows
 
 ## 依赖和安装
 
-本项目依赖上游的 `neteasecloudmusicapi` 程序（为nodejs程序），支持两种模式
+本项目依赖上游的 [`neteasecloudmusicapi`](https://github.com/Binaryify/NeteaseCloudMusicApi) 项目（为nodejs程序），支持两种模式
 - `local api` 模式，依赖程序部署在本地
   - 访问速度很快，没有账号安全隐患
   - 需要在本地部署依赖程序，占用较大存储空间（100MB左右）（此外还需要nodejs环境），运行时也需占用额外内存
